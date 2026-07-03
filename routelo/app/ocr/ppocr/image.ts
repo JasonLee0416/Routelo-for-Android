@@ -8,6 +8,7 @@ import { decode } from 'jpeg-js';
 import { Image } from 'react-native';
 
 import type { PpOcrRegion } from './types';
+import type { PpOcrOrientation } from './orientation';
 
 export type DecodedJpeg = {
   width: number;
@@ -42,6 +43,18 @@ async function manipulateToJpeg(uri: string, actions: Action[]) {
     height: decoded.height,
     rgba: decoded.data,
   } satisfies DecodedJpeg;
+}
+
+export async function prepareOrientationVariantUri(
+  uri: string,
+  orientation: PpOcrOrientation,
+): Promise<string> {
+  if (orientation === 0) return uri;
+  const result = await manipulateAsync(uri, [{ rotate: orientation }], {
+    compress: 0.95,
+    format: SaveFormat.JPEG,
+  });
+  return result.uri;
 }
 
 export async function prepareDetectorImage(

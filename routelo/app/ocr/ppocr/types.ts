@@ -27,4 +27,6 @@ export type PpOcrResult = {
   fullText: string;
   lines: PpOcrLine[];
   processingMs: number;
+  orientationDegrees?: 0 | 90 | 180 | 270;
+  variantsCompared?: number;
 };

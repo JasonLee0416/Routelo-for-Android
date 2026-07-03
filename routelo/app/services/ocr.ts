@@ -20,6 +20,8 @@ type RecognizedText = {
   modelVersion?: string;
   fullText: string;
   processingMs: number;
+  orientationDegrees?: 0 | 90 | 180 | 270;
+  variantsCompared?: number;
   lines?: Array<{
     text: string;
     boundingBox?: {
@@ -752,6 +754,7 @@ export async function runReceiptOcr(
       modelVersion: recognized.modelVersion,
       recognizedLines: recognized.lines,
       processingMs: recognized.processingMs,
+      variantsCompared: recognized.variantsCompared ?? parsed.variantsCompared,
     };
   } catch (error) {
     if (error instanceof OcrNoTextDetectedError) throw error;

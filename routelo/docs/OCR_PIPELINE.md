@@ -89,6 +89,16 @@ Before increasing model size, improve the image and post-processing pipeline:
 This order keeps APK size and device load under control while addressing the
 highest-probability causes of Korean receipt OCR failure.
 
+Current implementation status:
+
+- PP-OCR now evaluates the original orientation first.
+- If the original result is weak, it evaluates 90, 180, and 270 degree rotation
+  candidates and chooses the strongest result by line count, meaningful text
+  length, recognizer confidence, and detector region score.
+- This is an adaptive fallback, so normal upright receipts avoid the 4x OCR cost.
+- Receipt-region detection, four-point perspective crops, and real polygon DB
+  post-processing are still the next accuracy layer.
+
 ## 5. Field extraction and review rules
 
 - Dates must support both `YYYY-MM-DD` and Korean forms such as
