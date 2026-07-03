@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -8,6 +8,16 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+
+import {
+  createVisionCameraFrameStreamTelemetry,
+  recordVisionCameraFrame,
+  recordVisionCameraFrameDrop,
+  VisionCameraFrameMetadata,
+  visionCameraFrameStreamEnabled,
+  VisionCameraFrameStreamTelemetry,
+  visionCameraFrameStreamStatusLabel,
+} from './visionCameraFrameStream';
 
 declare const require: (moduleName: string) => unknown;
 
@@ -22,6 +32,11 @@ type VisionCameraRuntime = {
   Camera: React.ComponentType<Record<string, unknown>>;
   useCameraDevice: (position: 'back' | 'front' | 'external') => unknown;
   useCameraPermission: () => VisionCameraPermissionState;
+  useFrameOutput?: (props: Record<string, unknown>) => unknown;
+  scheduleOnRN?: <Args extends unknown[]>(
+    fun: (...args: Args) => void,
+    ...args: Args
+  ) => void;
 };
 
 export const VISION_CAMERA_PREVIEW_PROBE_ENV =
@@ -35,6 +50,7 @@ export function visionCameraPreviewProbeEnabled(
 
 type VisionCameraPreviewProbeProps = {
   enabled?: boolean;
+  frameStreamEnabled?: boolean;
   isActive?: boolean;
   style?: StyleProp<ViewStyle>;
 };
@@ -45,7 +61,27 @@ function loadVisionCameraRuntime(): VisionCameraRuntime | null {
   }
 
   try {
-    return require('react-native-vision-camera') as VisionCameraRuntime;
+    const visionCamera = require(
+      'react-native-vision-camera',
+    ) as VisionCameraRuntime;
+    let scheduleOnRN:
+      | VisionCameraRuntime['scheduleOnRN']
+      | undefined;
+    try {
+      scheduleOnRN = (
+        require('react-native-worklets') as Pick<
+          VisionCameraRuntime,
+          'scheduleOnRN'
+        >
+      ).scheduleOnRN;
+    } catch {
+      scheduleOnRN = undefined;
+    }
+
+    return {
+      ...visionCamera,
+      scheduleOnRN,
+    };
   } catch {
     return null;
   }
@@ -53,6 +89,7 @@ function loadVisionCameraRuntime(): VisionCameraRuntime | null {
 
 export function VisionCameraPreviewProbe({
   enabled = visionCameraPreviewProbeEnabled(),
+  frameStreamEnabled = visionCameraFrameStreamEnabled(),
   isActive = true,
   style,
 }: VisionCameraPreviewProbeProps) {
@@ -76,6 +113,7 @@ export function VisionCameraPreviewProbe({
 
   return (
     <VisionCameraPreviewProbeNative
+      frameStreamEnabled={frameStreamEnabled}
       isActive={isActive}
       runtime={runtime}
       style={style}
@@ -84,19 +122,84 @@ export function VisionCameraPreviewProbe({
 }
 
 function VisionCameraPreviewProbeNative({
+  frameStreamEnabled = visionCameraFrameStreamEnabled(),
   isActive,
   runtime,
   style,
 }: VisionCameraPreviewProbeProps & { runtime: VisionCameraRuntime }) {
   const CameraView = runtime.Camera;
+  const scheduleOnRN = runtime.scheduleOnRN;
+  const useFrameOutput = runtime.useFrameOutput;
   const device = runtime.useCameraDevice('back');
   const permission = runtime.useCameraPermission();
+  const [frameTelemetry, setFrameTelemetry] =
+    useState<VisionCameraFrameStreamTelemetry>(
+      createVisionCameraFrameStreamTelemetry,
+    );
   const [previewStatus, setPreviewStatus] = useState<
     'idle' | 'started' | 'stopped' | 'error'
   >('idle');
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   const previewActive = Boolean(isActive && permission.hasPermission && device);
+  const frameStreamReady = Boolean(
+    frameStreamEnabled && useFrameOutput && scheduleOnRN,
+  );
+
+  const recordFrame = useCallback((metadata: VisionCameraFrameMetadata) => {
+    setFrameTelemetry((current) =>
+      recordVisionCameraFrame(current, metadata),
+    );
+  }, []);
+
+  const recordDroppedFrame = useCallback((reason: string) => {
+    setFrameTelemetry((current) =>
+      recordVisionCameraFrameDrop(current, reason),
+    );
+  }, []);
+
+  const frameOutput = frameStreamReady
+    ? useFrameOutput?.({
+        targetResolution: { width: 1280, height: 720 },
+        pixelFormat: 'yuv',
+        dropFramesWhileBusy: true,
+        enablePreviewSizedOutputBuffers: true,
+        allowDeferredStart: true,
+        onFrame(frame: Record<string, unknown> & { dispose?: () => void }) {
+          'worklet';
+          const metadata = {
+            width: Number(frame.width ?? 0),
+            height: Number(frame.height ?? 0),
+            timestamp: Number(frame.timestamp ?? 0),
+            orientation:
+              typeof frame.orientation === 'string'
+                ? frame.orientation
+                : undefined,
+            pixelFormat:
+              typeof frame.pixelFormat === 'string'
+                ? frame.pixelFormat
+                : undefined,
+            isMirrored:
+              typeof frame.isMirrored === 'boolean'
+                ? frame.isMirrored
+                : undefined,
+            isPlanar:
+              typeof frame.isPlanar === 'boolean' ? frame.isPlanar : undefined,
+            hasPixelBuffer:
+              typeof frame.hasPixelBuffer === 'boolean'
+                ? frame.hasPixelBuffer
+                : undefined,
+            capturedAt: Date.now(),
+          };
+          frame.dispose?.();
+          scheduleOnRN?.(recordFrame, metadata);
+        },
+        onFrameDropped(reason: string) {
+          'worklet';
+          scheduleOnRN?.(recordDroppedFrame, String(reason));
+        },
+      })
+    : undefined;
 
   const requestPermission = () => {
     void permission.requestPermission();
@@ -108,7 +211,8 @@ function VisionCameraPreviewProbeNative({
         <View>
           <Text style={styles.title}>VisionCamera preview probe</Text>
           <Text style={styles.caption}>
-            Dev-only camera preview check. OCR frame streaming is not wired yet.
+            Dev-only camera preview check. Frame metadata streaming is optional
+            and does not run OCR yet.
           </Text>
         </View>
         <View style={styles.badge}>
@@ -124,6 +228,7 @@ function VisionCameraPreviewProbeNative({
             style={StyleSheet.absoluteFill}
             device={device}
             isActive={previewActive}
+            outputs={frameOutput ? [frameOutput] : []}
             resizeMode="cover"
             enableNativeTapToFocusGesture
             onPreviewStarted={() => {
@@ -159,7 +264,42 @@ function VisionCameraPreviewProbeNative({
         <Text style={styles.statusText}>
           Device: {device ? 'back camera found' : 'not found'}
         </Text>
+        <Text style={styles.statusText}>
+          Frames:{' '}
+          {visionCameraFrameStreamStatusLabel(
+            frameStreamReady,
+            frameTelemetry,
+          )}
+        </Text>
+        <Text style={styles.statusText}>
+          Count: {frameTelemetry.receivedFrames}
+        </Text>
+        <Text style={styles.statusText}>
+          Drops: {frameTelemetry.droppedFrames}
+        </Text>
       </View>
+
+      {frameStreamEnabled && !frameStreamReady ? (
+        <Text style={styles.warningText}>
+          Frame stream requested, but VisionCamera Worklets are unavailable.
+          Still-photo OCR remains the fallback.
+        </Text>
+      ) : null}
+
+      {frameTelemetry.lastFrame ? (
+        <Text style={styles.frameText}>
+          Last frame: {frameTelemetry.lastFrame.width}×
+          {frameTelemetry.lastFrame.height} ·{' '}
+          {frameTelemetry.lastFrame.pixelFormat ?? 'unknown format'} ·{' '}
+          {frameTelemetry.lastFrame.orientation ?? 'unknown orientation'}
+        </Text>
+      ) : null}
+
+      {frameTelemetry.lastDroppedReason ? (
+        <Text style={styles.frameText}>
+          Last dropped frame: {frameTelemetry.lastDroppedReason}
+        </Text>
+      ) : null}
 
       {previewError ? (
         <Text style={styles.errorText}>{previewError}</Text>
@@ -265,6 +405,18 @@ const styles = StyleSheet.create({
     color: '#B42318',
     fontSize: 12,
     fontWeight: '700',
+  },
+  warningText: {
+    color: '#B54708',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  frameText: {
+    color: '#244E8F',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
   },
   permissionButton: {
     alignItems: 'center',

@@ -77,6 +77,11 @@ VisionCamera integration status:
   scanner when `EXPO_PUBLIC_ROUTELO_ENABLE_VISION_CAMERA_PREVIEW=1` is set.
   This is a device-readiness probe only; it does not feed preview frames into
   OCR yet.
+- `VisionCameraPreviewProbe` can also attach a dev-only VisionCamera frame
+  output when `EXPO_PUBLIC_ROUTELO_ENABLE_VISION_CAMERA_FRAME_STREAM=1` is set.
+  The current stream records frame metadata and dropped-frame telemetry only.
+  It intentionally does not convert native buffers into OCR assets, so the app
+  cannot invent receipt data from a frame that has not been decoded.
 - The app still reports live frame OCR as unavailable until preview frame
   streaming is wired into `LiveOcrFrameScanner`.
 - `ImagePicker` still-photo OCR remains the safe fallback.
