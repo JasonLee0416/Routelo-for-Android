@@ -2,15 +2,21 @@ import { Platform } from 'react-native';
 
 import type { OcrPipelineResult } from '../models';
 import type { LiveOcrNativeFrameMetadata } from '../services/liveFrameScanner';
+import {
+  androidNativePpocrFrameRecognizerEnabled,
+  inspectAndroidNativePpocrFrameRecognizer,
+  type AndroidNativePpocrFrameRecognizerBinding,
+} from './androidNativePpocrFrameRecognizer';
 
 export type NativeFrameOcrRecognizerId =
   | 'android-native-ppocr'
-  | 'ios-apple-vision'
-  | 'ios-clova-fallback';
+  | 'clova-cloud-fallback';
 
 export type NativeFrameOcrRecognizerStatus =
   | 'available'
   | 'unsupported-platform'
+  | 'ios-out-of-scope'
+  | 'disabled'
   | 'native-recognizer-missing'
   | 'cloud-consent-required';
 
@@ -39,8 +45,21 @@ export type NativeFrameOcrRecognizer = {
 export function nativeFrameOcrRecognizerCapability(
   platform: typeof Platform.OS,
   hasNativeRecognizer = false,
+  enabled = androidNativePpocrFrameRecognizerEnabled(),
 ): NativeFrameOcrRecognizerCapability {
-  if (platform !== 'android' && platform !== 'ios') {
+  if (platform === 'ios') {
+    return {
+      available: false,
+      status: 'ios-out-of-scope',
+      platform,
+      directFrameBuffer: false,
+      fallback: 'still-photo',
+      reason:
+        'iOS native OCR is out of scope for this Android-focused repository. Use the dedicated Routelo for iOS repository.',
+    };
+  }
+
+  if (platform !== 'android') {
     return {
       available: false,
       status: 'unsupported-platform',
@@ -51,25 +70,43 @@ export function nativeFrameOcrRecognizerCapability(
     };
   }
 
-  if (!hasNativeRecognizer) {
+  const androidState = inspectAndroidNativePpocrFrameRecognizer({
+    enabled,
+    binding: hasNativeRecognizer
+      ? ({
+          recognizeFrame() {
+            throw new Error('Capability probe binding must not run.');
+          },
+        } satisfies AndroidNativePpocrFrameRecognizerBinding)
+      : null,
+  });
+
+  if (!androidState.enabled) {
+    return {
+      available: false,
+      status: 'disabled',
+      platform,
+      directFrameBuffer: true,
+      fallback: 'still-photo',
+      reason: androidState.reason,
+    };
+  }
+
+  if (!androidState.ready) {
     return {
       available: false,
       status: 'native-recognizer-missing',
       platform,
       directFrameBuffer: true,
       fallback: 'still-photo',
-      reason:
-        platform === 'android'
-          ? 'Android native PP-OCR frame recognizer is not bundled yet.'
-          : 'iOS Apple Vision frame recognizer is not bundled yet.',
+      reason: androidState.reason,
     };
   }
 
   return {
     available: true,
     status: 'available',
-    recognizerId:
-      platform === 'android' ? 'android-native-ppocr' : 'ios-apple-vision',
+    recognizerId: 'android-native-ppocr',
     platform,
     directFrameBuffer: true,
     fallback: 'still-photo',

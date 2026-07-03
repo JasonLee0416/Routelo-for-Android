@@ -18,6 +18,10 @@ import {
   VisionCameraFrameStreamTelemetry,
   visionCameraFrameStreamStatusLabel,
 } from './visionCameraFrameStream';
+import {
+  androidNativePpocrFrameRecognizerStatusLabel,
+  inspectAndroidNativePpocrFrameRecognizer,
+} from './androidNativePpocrFrameRecognizer';
 
 declare const require: (moduleName: string) => unknown;
 
@@ -145,6 +149,7 @@ function VisionCameraPreviewProbeNative({
   const frameStreamReady = Boolean(
     frameStreamEnabled && useFrameOutput && scheduleOnRN,
   );
+  const androidNativeOcrState = inspectAndroidNativePpocrFrameRecognizer();
 
   const recordFrame = useCallback((metadata: VisionCameraFrameMetadata) => {
     setFrameTelemetry((current) =>
@@ -277,6 +282,14 @@ function VisionCameraPreviewProbeNative({
         <Text style={styles.statusText}>
           Drops: {frameTelemetry.droppedFrames}
         </Text>
+        {Platform.OS === 'android' ? (
+          <Text style={styles.statusText}>
+            Android OCR:{' '}
+            {androidNativePpocrFrameRecognizerStatusLabel(
+              androidNativeOcrState,
+            )}
+          </Text>
+        ) : null}
       </View>
 
       {frameStreamEnabled && !frameStreamReady ? (
@@ -284,6 +297,10 @@ function VisionCameraPreviewProbeNative({
           Frame stream requested, but VisionCamera Worklets are unavailable.
           Still-photo OCR remains the fallback.
         </Text>
+      ) : null}
+
+      {Platform.OS === 'android' && androidNativeOcrState.reason ? (
+        <Text style={styles.frameText}>{androidNativeOcrState.reason}</Text>
       ) : null}
 
       {frameTelemetry.lastFrame ? (

@@ -42,7 +42,7 @@ Current implementation status:
 
 - `LiveOcrFrameScanner` accepts frame assets from a future native camera source.
 - `liveCameraFrameSourceCapability()` is the platform gate for that source. It
-  reports Android/iOS as `native-adapter-missing` until a bundled native preview
+  reports Android as `native-adapter-missing` until a bundled native preview
   frame adapter is registered, so the app cannot pretend live OCR is available
   while only the ImagePicker still-photo flow exists.
 - It enforces a configurable sampling interval, initially suitable for the
@@ -56,12 +56,11 @@ Current implementation status:
   quality rejections, OCR runs/failures, accepted frames, promoted fields, and
   last OCR latency.
 
-Still missing: the native camera preview adapter that supplies continuous frame
-assets. The adapter must implement the `LiveCameraFrameSource` contract, emit
-`LiveOcrFrameAsset` objects into `LiveOcrFrameScanner`, and keep still-photo OCR
-as the fallback when preview frames are unavailable. The engine is intentionally
-platform-neutral so Android and iOS can use the same accumulation policy once
-the adapter exists.
+Still missing: the Android native OCR recognizer that consumes VisionCamera
+frame buffers directly. The recognizer must return OCR evidence into
+`LiveOcrFrameScanner.acceptRecognizedNativeFrame()` and keep still-photo OCR as
+the fallback when native frame OCR is unavailable. This repository is now
+Android-focused; iOS OCR work belongs in the dedicated Routelo for iOS repo.
 
 Current implementation direction: use VisionCamera as the first native frame
 source candidate. See
@@ -85,14 +84,14 @@ VisionCamera integration status:
   It intentionally does not convert native buffers into OCR assets, so the app
   cannot invent receipt data from a frame that has not been decoded.
 - `LiveOcrFrameScanner.acceptRecognizedNativeFrame()` can now ingest OCR results
-  that were produced directly from Android/iOS native frame buffers. This keeps
+  that were produced directly from Android native frame buffers. This keeps
   the accumulation, quality gate, backpressure, and no-auto-save behavior shared
   with the still-photo OCR path.
 - `nativeFrameOcrRecognizer` defines the fail-closed platform contract for the
-  upcoming recognizers: Android native PP-OCR first, iOS Apple Vision first, and
-  CLOVA only as a user-consented cloud fallback.
-- The app still reports live frame OCR as unavailable until the Android/iOS
-  native recognizer bindings are bundled.
+  upcoming Android native PP-OCR recognizer. iOS is explicitly out of scope for
+  this repository, and CLOVA remains a later user-consented cloud fallback.
+- The app still reports live frame OCR as unavailable until the Android native
+  PP-OCR recognizer binding is bundled.
 - `ImagePicker` still-photo OCR remains the safe fallback.
 
 Minimum live-scan checklist:
