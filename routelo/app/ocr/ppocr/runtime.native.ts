@@ -7,10 +7,18 @@ import { extractDbTextRegions } from './dbPostprocess';
 import {
   detectorTensorData,
   prepareDetectorImage,
+  prepareOrientationVariantUri,
   prepareRecognitionCrop,
   recognizerTensorData,
 } from './image';
 import { PP_OCR_MODEL_VERSION } from './modelManifest';
+import {
+  chooseBestOrientationCandidate,
+  isGoodOrientationCandidate,
+  PP_OCR_ORIENTATION_CANDIDATES,
+  PpOcrOrientation,
+  PpOcrOrientationCandidate,
+} from './orientation';
 import type { PpOcrLine, PpOcrResult } from './types';
 
 const DETECTOR_ASSET = require('../../../assets/ocr/ch_PP-OCRv5_det_mobile.onnx');
@@ -94,7 +102,13 @@ export async function recognizeReceiptWithPpOcr(
   if (!imageUri.trim()) throw new Error('Receipt image URI is required.');
   const startedAt = Date.now();
   const { ort, detector, recognizer, dictionary } = await loadRuntime();
-  const detectorImage = await prepareDetectorImage(imageUri);
+
+  const runOrientationCandidate = async (
+    orientation: PpOcrOrientation,
+  ): Promise<PpOcrOrientationCandidate> => {
+    const candidateStartedAt = Date.now();
+    const variantUri = await prepareOrientationVariantUri(imageUri, orientation);
+    const detectorImage = await prepareDetectorImage(variantUri);
   const detectorInput = new ort.Tensor(
     'float32',
     detectorTensorData(detectorImage),
@@ -122,7 +136,7 @@ export async function recognizeReceiptWithPpOcr(
 
   const lines: PpOcrLine[] = [];
   for (const region of regions) {
-    const crop = await prepareRecognitionCrop(imageUri, region);
+      const crop = await prepareRecognitionCrop(variantUri, region);
     const input = new ort.Tensor('float32', recognizerTensorData(crop), [
       1,
       3,
@@ -153,11 +167,31 @@ export async function recognizeReceiptWithPpOcr(
     }
   }
 
+    return {
+      orientation,
+      lines,
+      regions,
+      processingMs: Date.now() - candidateStartedAt,
+    };
+  };
+
+  const candidates: PpOcrOrientationCandidate[] = [];
+  const original = await runOrientationCandidate(0);
+  candidates.push(original);
+  if (!isGoodOrientationCandidate(original)) {
+    for (const orientation of PP_OCR_ORIENTATION_CANDIDATES.slice(1)) {
+      candidates.push(await runOrientationCandidate(orientation));
+    }
+  }
+  const best = chooseBestOrientationCandidate(candidates);
+
   return {
     engine: 'ppocrv5',
     modelVersion: PP_OCR_MODEL_VERSION,
-    fullText: lines.map(({ text }) => text).join('\n'),
-    lines,
+    fullText: best.lines.map(({ text }) => text).join('\n'),
+    lines: best.lines,
     processingMs: Date.now() - startedAt,
+    orientationDegrees: best.orientation,
+    variantsCompared: candidates.length,
   };
 }

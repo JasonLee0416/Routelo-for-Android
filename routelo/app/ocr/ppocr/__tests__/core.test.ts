@@ -1,5 +1,23 @@
 import { decodeCtc } from '../ctc';
 import { extractDbTextRegions } from '../dbPostprocess';
+import {
+  chooseBestOrientationCandidate,
+  isGoodOrientationCandidate,
+  scoreOrientationCandidate,
+} from '../orientation';
+import type { PpOcrLine } from '../types';
+
+const line = (text: string, confidence: number): PpOcrLine => ({
+  text,
+  confidence,
+  boundingBox: { x: 0, y: 0, width: 100, height: 20 },
+  cornerPoints: [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 20 },
+    { x: 0, y: 20 },
+  ],
+});
 
 describe('PP-OCR shared core', () => {
   it('decodes CTC blanks and repeated characters', () => {
@@ -32,5 +50,51 @@ describe('PP-OCR shared core', () => {
     expect(regions[0].score).toBeCloseTo(0.9);
     expect(regions[0].boundingBox.width).toBeGreaterThan(40);
     expect(regions[0].cornerPoints).toHaveLength(4);
+  });
+
+  it('scores meaningful orientation candidates above empty OCR results', () => {
+    const empty = {
+      orientation: 0 as const,
+      lines: [],
+      regions: [],
+      processingMs: 30,
+    };
+    const useful = {
+      orientation: 90 as const,
+      lines: [
+        line('발주처 아뜰리에몽플라워', 0.82),
+        line('배달장소 서울 영등포구 공군호텔', 0.78),
+        line('전화번호 010-1234-5678', 0.75),
+      ],
+      regions: [
+        { score: 0.8, boundingBox: { x: 0, y: 0, width: 100, height: 20 }, cornerPoints: line('', 0).cornerPoints },
+        { score: 0.7, boundingBox: { x: 0, y: 24, width: 160, height: 20 }, cornerPoints: line('', 0).cornerPoints },
+        { score: 0.6, boundingBox: { x: 0, y: 48, width: 120, height: 20 }, cornerPoints: line('', 0).cornerPoints },
+      ],
+      processingMs: 40,
+    };
+
+    expect(scoreOrientationCandidate(useful).score).toBeGreaterThan(
+      scoreOrientationCandidate(empty).score,
+    );
+    expect(chooseBestOrientationCandidate([empty, useful])).toBe(useful);
+  });
+
+  it('treats strong original-orientation OCR as good enough to skip rotation fallbacks', () => {
+    const candidate = {
+      orientation: 0 as const,
+      lines: [
+        line('발주처 아뜰리에몽플라워', 0.82),
+        line('품명 축하3단', 0.78),
+        line('배달일시 2026년 06월 14일', 0.78),
+        line('예식 12시20분', 0.76),
+        line('배달장소 서울 영등포구 공군호텔', 0.79),
+        line('받는분 신부 선단비', 0.72),
+      ],
+      regions: [],
+      processingMs: 50,
+    };
+
+    expect(isGoodOrientationCandidate(candidate)).toBe(true);
   });
 });
