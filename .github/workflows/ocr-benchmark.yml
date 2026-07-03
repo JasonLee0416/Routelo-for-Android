@@ -1,0 +1,31 @@
+name: OCR Benchmark Dataset
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/ocr/**"
+      - ".github/workflows/ocr-benchmark.yml"
+  push:
+    branches:
+      - main
+      - "codex/**"
+    paths:
+      - "benchmarks/ocr/**"
+      - ".github/workflows/ocr-benchmark.yml"
+
+jobs:
+  validate-ocr-benchmark:
+    name: Validate OCR benchmark dataset
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: benchmarks/ocr/receipt-samples
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate dataset and metric harness
+        run: npm test

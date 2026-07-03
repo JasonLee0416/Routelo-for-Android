@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Minimum OCR gates before a candidate can replace or materially change the app OCR path.",
+  "deviceTargets": {
+    "primaryIos": "iPhone 14 or newer",
+    "androidFloor": "mid-range Android device with offline ONNX Runtime support"
+  },
+  "privacyRequirements": {
+    "defaultOffline": true,
+    "noReceiptImageUploadByDefault": true,
+    "noRecipientPiiUploadByDefault": true,
+    "cloudOrMultimodalLlmAllowedOnlyAsOptInExperiment": true
+  },
+  "minimumForExperimentMerge": {
+    "rawText": {
+      "originalImages": {
+        "maxEmptyResultRate": 0.125,
+        "maxNormalizedCer": 0.45
+      },
+      "rotationVariants": {
+        "maxEmptyResultRate": 0.25,
+        "maxNormalizedCerRegressionFromOriginal": 0.2
+      }
+    },
+    "runtime": {
+      "maxWarmLatencyMsPerReceipt": 3500,
+      "maxColdLatencyMsPerReceipt": 6500,
+      "maxPeakMemoryMb": 450,
+      "maxAppSizeIncreaseMb": 90
+    }
+  },
+  "minimumForProductionDefault": {
+    "rawText": {
+      "originalImages": {
+        "maxEmptyResultRate": 0.05,
+        "maxNormalizedCer": 0.28
+      },
+      "rotationVariants": {
+        "maxEmptyResultRate": 0.1,
+        "maxNormalizedCerRegressionFromOriginal": 0.08
+      }
+    },
+    "runtime": {
+      "maxWarmLatencyMsPerReceipt": 2500,
+      "maxColdLatencyMsPerReceipt": 5000,
+      "maxPeakMemoryMb": 350,
+      "maxAppSizeIncreaseMb": 70
+    }
+  },
+  "mustNotPassIf": [
+    "required receipt text is fabricated without source evidence",
+    "recipient name, phone, address, raw OCR text, or receipt image is uploaded by default",
+    "rotated receipts collapse to empty text while the current baseline returns text",
+    "the candidate cannot run on both Android and iOS unless explicitly scoped as a non-production experiment"
+  ]
+}

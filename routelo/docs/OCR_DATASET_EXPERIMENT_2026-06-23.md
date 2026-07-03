@@ -25,6 +25,8 @@
 
 ## 데이터셋
 
+현재 샘플 원본은 앱 번들 밖의
+`benchmarks/ocr/receipt-samples/images/` 아래에 보관한다. 이 실험 당시에는
 저장소 루트의 가상 인수증 JPEG 8장을 사용했다.
 
 - `KakaoTalk_20260621_070828835.jpg`
@@ -36,7 +38,8 @@
 - `KakaoTalk_20260621_070828835_06.jpg`
 - `KakaoTalk_20260621_070828835_07.jpg`
 
-모든 이미지는 원본 변경 없이 테스트 APK의 asset으로 복사했다. 각 이미지의 SHA-256은 [native-results.json](ocr-benchmark/2026-06-23/native-results.json)에 기록되어 있어 이후 실험에서도 동일 입력인지 확인할 수 있다.
+모든 이미지는 원본 변경 없이 테스트 APK의 asset으로 복사했다. 각 이미지의 SHA-256은 [native-results.json](ocr-benchmark/2026-06-23/native-results.json)과
+`benchmarks/ocr/receipt-samples/manifest.json`에 기록되어 있어 이후 실험에서도 동일 입력인지 확인할 수 있다.
 
 ## 통제 환경
 

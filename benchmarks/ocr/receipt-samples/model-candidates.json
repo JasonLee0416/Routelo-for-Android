@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "selectionPrinciple": "Prefer the smallest local/offline pipeline that clears the production gates. Do not switch models until the benchmark proves the current failure is model-limited rather than preprocessing/postprocessing-limited.",
+  "recommendedOrder": [
+    "ppocrv5-mobile-current-plus-rotation-and-polygon",
+    "ppocrv5-mobile-current",
+    "ppocrv5-or-ppocrv6-larger-recognizer-eval",
+    "dual-pass-local-ocr-forest",
+    "video-frame-ocr-accumulator",
+    "opt-in-multimodal-llm-review"
+  ],
+  "candidates": [
+    {
+      "id": "ppocrv5-mobile-current",
+      "kind": "baseline",
+      "runtime": "onnxruntime-react-native",
+      "offline": true,
+      "appDefaultEligible": true,
+      "description": "Current pinned PP-OCRv5 mobile detector + Korean mobile recognizer.",
+      "whyTest": "Provides the baseline. No candidate is meaningful until it beats this on the same golden dataset.",
+      "expectedStrengths": ["smallest current app delta", "shared Android/iOS path", "offline"],
+      "expectedRisks": ["weak rotation handling", "axis-aligned crop distortion", "dense receipt recall"]
+    },
+    {
+      "id": "ppocrv5-mobile-current-plus-rotation-and-polygon",
+      "kind": "structural-improvement",
+      "runtime": "onnxruntime-react-native",
+      "offline": true,
+      "appDefaultEligible": true,
+      "description": "Keep current models but add orientation variants, real DB polygon postprocess, and perspective text-line crops.",
+      "whyTest": "Most likely first win: it targets the known failure mode without increasing model size.",
+      "expectedStrengths": ["rotation robustness", "better recognizer crops", "minimal app-size increase"],
+      "expectedRisks": ["extra latency from multiple variants", "more complex postprocess"]
+    },
+    {
+      "id": "ppocrv5-or-ppocrv6-larger-recognizer-eval",
+      "kind": "model-swap-evaluation",
+      "runtime": "onnxruntime-react-native if converted and licensed",
+      "offline": true,
+      "appDefaultEligible": "only if size/latency gates pass",
+      "description": "Evaluate larger/newer Korean-compatible recognizers only after crop/orientation fixes are measured.",
+      "whyTest": "Useful if corrected crops still miss dense Korean receipt text.",
+      "expectedStrengths": ["higher character accuracy on small text"],
+      "expectedRisks": ["larger binary", "slower CPU inference", "conversion/compatibility cost"]
+    },
+    {
+      "id": "dual-pass-local-ocr-forest",
+      "kind": "local-ensemble",
+      "runtime": "on-device OCR adapters behind the existing recognizer contract",
+      "offline": true,
+      "appDefaultEligible": "only if latency remains acceptable",
+      "description": "Run two local OCR candidates or preprocessing variants and choose field candidates by evidence score.",
+      "whyTest": "Useful when no single preprocessing/model path dominates all receipt layouts.",
+      "expectedStrengths": ["higher recall", "per-field fallback"],
+      "expectedRisks": ["latency", "battery/thermal pressure", "candidate merge complexity"]
+    },
+    {
+      "id": "video-frame-ocr-accumulator",
+      "kind": "capture-workflow",
+      "runtime": "same local OCR model, repeated on preview frames",
+      "offline": true,
+      "appDefaultEligible": true,
+      "description": "Instead of one still photo, sample frames every ~500 ms during capture and fill fields when repeated high-confidence text stabilizes.",
+      "whyTest": "Can beat still-photo OCR without a bigger model by selecting sharper frames and accumulating evidence.",
+      "expectedStrengths": ["blur reduction", "confidence voting", "less user retake friction"],
+      "expectedRisks": ["camera integration complexity", "battery use", "must avoid auto-filling low-evidence PII"]
+    },
+    {
+      "id": "opt-in-multimodal-llm-review",
+      "kind": "cloud-or-local-llm-experiment",
+      "runtime": "explicit opt-in review flow only",
+      "offline": false,
+      "appDefaultEligible": false,
+      "description": "Escalate a user-approved receipt image or anonymized crop to multimodal reasoning only for review, never default OCR.",
+      "whyTest": "Potentially strong for complex forms, but privacy and latency make it a non-default fallback.",
+      "expectedStrengths": ["layout reasoning", "field extraction"],
+      "expectedRisks": ["PII upload", "cost", "latency", "policy/consent requirements"]
+    }
+  ]
+}

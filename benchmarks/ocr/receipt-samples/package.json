@@ -1,0 +1,8 @@
+{
+  "name": "routelo-ocr-receipt-samples",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/validate-dataset.mjs && node scripts/evaluate-text-candidate.mjs --candidate-name golden-self-check --predictions-dir golden/raw_golden_answer_text --max-normalized-cer 0"
+  }
+}

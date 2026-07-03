@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "routelo-receipt-samples-2026-06-21",
+  "purpose": "OCR pipeline benchmark data kept outside the mobile app bundle.",
+  "goldenTextKind": "raw_golden_answer_text",
+  "unknownToken": "[불명]",
+  "samples": [
+    {
+      "image": "images/KakaoTalk_20260621_070828835.jpg",
+      "rawGoldenText": "golden/raw_golden_answer_text/KakaoTalk_20260621_070828835.txt",
+      "sha256": "f6a8f334b3a62552b6aafae35bda12237a7d720cfdf86fd706b98015e01ac5c0",
+      "notes": "Folded, perspective-skewed KDFC receipt; partially occluded header and phone rows."
+    },
+    {
+      "image": "images/KakaoTalk_20260621_070828835_01.jpg",
+      "rawGoldenText": "golden/raw_golden_answer_text/KakaoTalk_20260621_070828835_01.txt",
+      "sha256": "3f9a4c2906a9628d857eefde18c220733f679bff5b0c371e749f35b864d94617",
+      "notes": "99FLOWER receipt, rotated/skewed; bottom QR area cropped."
+    },
+    {
+      "image": "images/KakaoTalk_20260621_070828835_02.jpg",
+      "rawGoldenText": "golden/raw_golden_answer_text/KakaoTalk_20260621_070828835_02.txt",
+      "sha256": "de997ebb1591f894e8dff95e4885f112873275611a0e1bf8e05ac493d5761f0b",
+      "notes": "BESTFLOWER funeral receipt with handwritten blue marks and circled phone area."
+    },
+    {
+      "image": "images/KakaoTalk_20260621_070828835_03.jpg",
+      "rawGoldenText": "golden/raw_golden_answer_text/KakaoTalk_20260621_070828835_03.txt",
+      "sha256": "7acb9bdb1f2e770b6c766ee83b2f18b64dbcf77329b84f5f9ca5452c9fce4872",
+      "notes": "BESTFLOWER funeral receipt; right side is partially cropped."
+    },
+    {
+      "image": "images/KakaoTalk_20260621_070828835_04.jpg",
+      "rawGoldenText": "golden/raw_golden_answer_text/KakaoTalk_20260621_070828835_04.txt",
+      "sha256": "8d6ba35bb97b418e0556cbb8d8ada6ba3ce10dea00f170133aeb7522e0c7ef78",
+      "notes": "Naver-style order form with perspective skew and blue handwritten overlay."
+    },
+    {
+      "image": "images/KakaoTalk_20260621_070828835_05.jpg",
+      "rawGoldenText": "golden/raw_golden_answer_text/KakaoTalk_20260621_070828835_05.txt",
+      "sha256": "ca5029ba62b77cdcd72d655be7f96d13f8752f678b73b24aba65076ee2156d30",
+      "notes": "KDFC receipt with skew and handwritten overlay; some address text is hard to read."
+    },
+    {
+      "image": "images/KakaoTalk_20260621_070828835_06.jpg",
+      "rawGoldenText": "golden/raw_golden_answer_text/KakaoTalk_20260621_070828835_06.txt",
+      "sha256": "9316ef3e58604fde7abd1e0feb8565f76e773fa0abf86d6accafb7b1361bf9e5",
+      "notes": "KDFC receipt, mostly flat but rotated; long sender line stresses layout and wrapping."
+    },
+    {
+      "image": "images/KakaoTalk_20260621_070828835_07.jpg",
+      "rawGoldenText": "golden/raw_golden_answer_text/KakaoTalk_20260621_070828835_07.txt",
+      "sha256": "6eb8012c226ccfc70cac39dc863ba94e9836fcf8383a68f8798641d9cd553533",
+      "notes": "99FLOWER funeral receipt with multiple phone/address fields and handwritten notes."
+    }
+  ]
+}
+
