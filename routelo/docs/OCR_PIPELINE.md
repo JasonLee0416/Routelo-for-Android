@@ -38,6 +38,24 @@ already designed around the future native flow:
 6. lock the three minimum scan fields after repeated stable evidence;
 7. move to review, not auto-save.
 
+Current implementation status:
+
+- `LiveOcrFrameScanner` accepts frame assets from a future native camera source.
+- It enforces a configurable sampling interval, initially suitable for the
+  400-700 ms range discussed in #61.
+- It rejects poor-quality frames before OCR.
+- It keeps only one OCR inference in flight and drops frames under backpressure
+  instead of queueing unbounded work.
+- It reuses the existing rolling live OCR accumulator and returns `ready` only
+  when the review threshold is met.
+- It records telemetry for sampled frames, interval skips, backpressure skips,
+  quality rejections, OCR runs/failures, accepted frames, promoted fields, and
+  last OCR latency.
+
+Still missing: the native camera preview adapter that supplies continuous frame
+assets. The engine is intentionally platform-neutral so Android and iOS can use
+the same accumulation policy once the adapter exists.
+
 Minimum live-scan checklist:
 
 - merchant / ordering vendor name;
