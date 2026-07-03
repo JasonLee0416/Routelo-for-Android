@@ -68,6 +68,15 @@ source candidate. See
 `docs/decisions/2026-07-03-live-ocr-frame-source-visioncamera.md` for the
 decision record and revisit triggers.
 
+VisionCamera integration status:
+
+- VisionCamera, Nitro Modules, and Nitro Image are installed.
+- `inspectVisionCameraLiveOcrReadiness()` can detect platform support, camera
+  permission state, and whether a back camera is available.
+- The app still reports live frame OCR as unavailable until preview frame
+  streaming is wired into `LiveOcrFrameScanner`.
+- `ImagePicker` still-photo OCR remains the safe fallback.
+
 Minimum live-scan checklist:
 
 - merchant / ordering vendor name;
