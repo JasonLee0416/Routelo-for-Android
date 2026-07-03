@@ -73,6 +73,10 @@ VisionCamera integration status:
 - VisionCamera, Nitro Modules, and Nitro Image are installed.
 - `inspectVisionCameraLiveOcrReadiness()` can detect platform support, camera
   permission state, and whether a back camera is available.
+- `VisionCameraPreviewProbe` can render a dev-only native preview inside the
+  scanner when `EXPO_PUBLIC_ROUTELO_ENABLE_VISION_CAMERA_PREVIEW=1` is set.
+  This is a device-readiness probe only; it does not feed preview frames into
+  OCR yet.
 - The app still reports live frame OCR as unavailable until preview frame
   streaming is wired into `LiveOcrFrameScanner`.
 - `ImagePicker` still-photo OCR remains the safe fallback.
