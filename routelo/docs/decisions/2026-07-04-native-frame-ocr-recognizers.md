@@ -70,6 +70,22 @@ That is deliberate. Until native PP-OCR can process a real VisionCamera frame
 buffer, the app must show the native entrypoint as present-but-not-ready and
 keep still-photo OCR as the safe fallback.
 
+## Frame-buffer binding shape
+
+The React Native `NativeModules` scaffold is useful for APK bundling and status
+inspection, but it is not the correct final transport for VisionCamera frames.
+VisionCamera v5 exposes live frames as Nitro `Frame` HybridObjects, so direct
+frame-buffer OCR must be implemented as a worklet-safe Nitro HybridObject.
+
+The JavaScript contract expects Android native code to register
+`RouteloAndroidPpocrFrameBufferRecognizer`. It receives a VisionCamera `Frame`
+and native-frame metadata, returns an `OcrPipelineResult`, and must report
+`frameBufferRecognitionReady=true` only after it can run real PP-OCR inference
+on the supplied frame buffer.
+
+Until then, the loader treats the recognizer as missing or not ready and does
+not call OCR from live frames.
+
 ## Revisit triggers
 
 - VisionCamera frame output cannot deliver stable buffers on target devices.

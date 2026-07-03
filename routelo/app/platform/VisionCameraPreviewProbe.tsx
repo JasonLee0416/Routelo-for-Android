@@ -23,6 +23,11 @@ import {
   inspectAndroidNativePpocrFrameRecognizer,
   loadAndroidNativePpocrFrameRecognizerBinding,
 } from './androidNativePpocrFrameRecognizer';
+import {
+  androidPpocrFrameBufferRecognizerStatusLabel,
+  inspectAndroidPpocrFrameBufferRecognizer,
+  loadAndroidPpocrFrameBufferRecognizer,
+} from './androidPpocrFrameBufferRecognizer';
 
 declare const require: (moduleName: string) => unknown;
 
@@ -154,9 +159,17 @@ function VisionCameraPreviewProbeNative({
     loadAndroidNativePpocrFrameRecognizerBinding,
     [],
   );
+  const androidFrameBufferRecognizer = useMemo(
+    loadAndroidPpocrFrameBufferRecognizer,
+    [],
+  );
   const androidNativeOcrState = inspectAndroidNativePpocrFrameRecognizer({
     binding: androidNativeOcrBinding,
   });
+  const androidFrameBufferOcrState =
+    inspectAndroidPpocrFrameBufferRecognizer({
+      recognizer: androidFrameBufferRecognizer,
+    });
 
   const recordFrame = useCallback((metadata: VisionCameraFrameMetadata) => {
     setFrameTelemetry((current) =>
@@ -297,6 +310,14 @@ function VisionCameraPreviewProbeNative({
             )}
           </Text>
         ) : null}
+        {Platform.OS === 'android' ? (
+          <Text style={styles.statusText}>
+            Frame-buffer OCR:{' '}
+            {androidPpocrFrameBufferRecognizerStatusLabel(
+              androidFrameBufferOcrState,
+            )}
+          </Text>
+        ) : null}
       </View>
 
       {frameStreamEnabled && !frameStreamReady ? (
@@ -308,6 +329,12 @@ function VisionCameraPreviewProbeNative({
 
       {Platform.OS === 'android' && androidNativeOcrState.reason ? (
         <Text style={styles.frameText}>{androidNativeOcrState.reason}</Text>
+      ) : null}
+
+      {Platform.OS === 'android' && androidFrameBufferOcrState.reason ? (
+        <Text style={styles.frameText}>
+          {androidFrameBufferOcrState.reason}
+        </Text>
       ) : null}
 
       {frameTelemetry.lastFrame ? (
