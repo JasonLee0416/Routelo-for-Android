@@ -63,6 +63,11 @@ as the fallback when preview frames are unavailable. The engine is intentionally
 platform-neutral so Android and iOS can use the same accumulation policy once
 the adapter exists.
 
+Current implementation direction: use VisionCamera as the first native frame
+source candidate. See
+`docs/decisions/2026-07-03-live-ocr-frame-source-visioncamera.md` for the
+decision record and revisit triggers.
+
 Minimum live-scan checklist:
 
 - merchant / ordering vendor name;
