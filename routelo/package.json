@@ -20,7 +20,10 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
+    "react-native-nitro-image": "^0.15.1",
+    "react-native-nitro-modules": "^0.36.1",
     "react-native-safe-area-context": "~5.7.0",
+    "react-native-vision-camera": "^5.1.0",
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
@@ -60,6 +63,16 @@
     "testMatch": [
       "**/__tests__/**/*.test.ts?(x)"
     ]
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "onnxruntime-react-native",
+          "react-native-nitro-image"
+        ]
+      }
+    }
   },
   "private": true
 }
