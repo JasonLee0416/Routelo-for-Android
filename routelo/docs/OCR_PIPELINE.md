@@ -99,6 +99,13 @@ VisionCamera integration status:
   rejects recognition calls until PP-OCR can consume VisionCamera frame buffers
   directly. This prevents fake or placeholder OCR data from entering the
   scanner.
+- Direct VisionCamera frame-buffer OCR must use the Nitro HybridObject path,
+  not the React Native `NativeModules` bridge. VisionCamera v5 exposes frames as
+  Nitro `Frame` HybridObjects, and the Android recognizer contract now expects a
+  native object registered as `RouteloAndroidPpocrFrameBufferRecognizer`.
+- Until that Nitro object is registered and reports
+  `frameBufferRecognitionReady=true`, the probe UI reports frame-buffer OCR as
+  unavailable and does not call OCR on live frames.
 - `ImagePicker` still-photo OCR remains the safe fallback.
 
 Minimum live-scan checklist:
