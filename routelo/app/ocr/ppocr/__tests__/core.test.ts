@@ -22,11 +22,7 @@ const line = (text: string, confidence: number): PpOcrLine => ({
 describe('PP-OCR shared core', () => {
   it('decodes CTC blanks and repeated characters', () => {
     const logits = new Float32Array([
-      10, 0, 0,
-      0, 10, 0,
-      0, 10, 0,
-      10, 0, 0,
-      0, 0, 10,
+      10, 0, 0, 0, 10, 0, 0, 10, 0, 10, 0, 0, 0, 0, 10,
     ]);
 
     expect(decodeCtc(logits, 5, 3, ['가', '나'])).toEqual({
@@ -52,6 +48,28 @@ describe('PP-OCR shared core', () => {
     expect(regions[0].cornerPoints).toHaveLength(4);
   });
 
+  it('preserves an oriented box for diagonal detector components', () => {
+    const map = new Float32Array(16 * 16);
+    for (let step = 0; step < 8; step += 1) {
+      const x = 4 + step;
+      const y = 4 + step;
+      map[y * 16 + x] = 0.92;
+      map[y * 16 + x + 1] = 0.9;
+    }
+
+    const regions = extractDbTextRegions(map, 16, 16, 160, 160, {
+      minArea: 4,
+      unclipRatio: 1.2,
+    });
+
+    expect(regions).toHaveLength(1);
+    const [topLeft, topRight] = regions[0].cornerPoints;
+    const angleDegrees =
+      (Math.atan2(topRight.y - topLeft.y, topRight.x - topLeft.x) * 180) /
+      Math.PI;
+    expect(Math.abs(angleDegrees)).toBeGreaterThan(10);
+  });
+
   it('scores meaningful orientation candidates above empty OCR results', () => {
     const empty = {
       orientation: 0 as const,
@@ -67,9 +85,21 @@ describe('PP-OCR shared core', () => {
         line('전화번호 010-1234-5678', 0.75),
       ],
       regions: [
-        { score: 0.8, boundingBox: { x: 0, y: 0, width: 100, height: 20 }, cornerPoints: line('', 0).cornerPoints },
-        { score: 0.7, boundingBox: { x: 0, y: 24, width: 160, height: 20 }, cornerPoints: line('', 0).cornerPoints },
-        { score: 0.6, boundingBox: { x: 0, y: 48, width: 120, height: 20 }, cornerPoints: line('', 0).cornerPoints },
+        {
+          score: 0.8,
+          boundingBox: { x: 0, y: 0, width: 100, height: 20 },
+          cornerPoints: line('', 0).cornerPoints,
+        },
+        {
+          score: 0.7,
+          boundingBox: { x: 0, y: 24, width: 160, height: 20 },
+          cornerPoints: line('', 0).cornerPoints,
+        },
+        {
+          score: 0.6,
+          boundingBox: { x: 0, y: 48, width: 120, height: 20 },
+          cornerPoints: line('', 0).cornerPoints,
+        },
       ],
       processingMs: 40,
     };
