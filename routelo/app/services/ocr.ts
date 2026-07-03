@@ -262,6 +262,70 @@ function normalizeDate(text: string) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function normalizeReceiptDate(text: string) {
+  const korean = text.match(/(20\d{2})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+  if (korean) {
+    const [year, month, day] = [
+      Number(korean[1]),
+      Number(korean[2]),
+      Number(korean[3]),
+    ];
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+    ) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+  return normalizeDate(text);
+}
+
+function normalizeReceiptTime(value: string) {
+  const compact = value.replace(/\s/g, '');
+  const colon = compact.match(/(\d{1,2}):(\d{2})/);
+  if (colon) {
+    const hour = Number(colon[1]);
+    const minute = Number(colon[2]);
+    if (hour <= 23 && minute <= 59) {
+      return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    }
+  }
+  const korean = compact.match(/(오전|오후)?(\d{1,2})시(?:(\d{1,2})분?)?/);
+  if (korean) {
+    let hour = Number(korean[2]);
+    const minute = Number(korean[3] || 0);
+    if (hour <= 23 && minute <= 59) {
+      if (korean[1] === '오후' && hour < 12) hour += 12;
+      if (korean[1] === '오전' && hour === 12) hour = 0;
+      return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    }
+  }
+  return '';
+}
+
+function normalizeReceiptQuantity(value: string) {
+  const explicit = value.match(/수량\s*[|:]?\s*(\d{1,2})/);
+  const count = explicit || value.match(/(\d{1,2})\s*(?:개|단|EA|ea)/);
+  const quantity = count ? Number(count[1]) : NaN;
+  if (Number.isInteger(quantity) && quantity > 0 && quantity <= 99) {
+    return String(quantity);
+  }
+  return normalizeQuantity(value);
+}
+
+function safeReceiptRecipientName(value: string) {
+  const trimmed = value.trim();
+  if (
+    !trimmed ||
+    /화원|반드시|이름|서명|수령|인수|받는분|받는 분/.test(trimmed)
+  ) {
+    return '';
+  }
+  return safeRecipientName(trimmed);
+}
+
 export function inspectCaptureQuality(asset: ImageAssetInfo): CaptureQuality {
   const width = asset.width || 1200;
   const height = asset.height || 1600;
@@ -340,7 +404,7 @@ export function parseReceiptText(
     );
   const quantitySource =
     findLabeledValue(lines, ['수량', '개수', '갯수']) ||
-    (productSource && /\d+\s*개/.test(productSource.value)
+    (productSource && /\d+\s*(?:개|단|EA|ea)/.test(productSource.value)
       ? productSource
       : undefined);
   const ribbonSource =
@@ -355,15 +419,22 @@ export function parseReceiptText(
       /삼가.*(?:명복|조의)|축하.*(?:결혼|개업)|부활/.test(line),
     );
 
-  const deliveryDate = normalizeDate(
-    mapped.deliveryDate || text,
+  const dateSource =
+    findLabeledValue(lines, ['배달일시', '배달일자', '배송일시', '배송일자']) ||
+    firstMatchingLine(lines, (line) =>
+      /20\d{2}[.\-/]\d{1,2}[.\-/]\d{1,2}|20\d{2}년\s*\d{1,2}월\s*\d{1,2}일/.test(
+        line,
+      ),
+    );
+  const deliveryDate = normalizeReceiptDate(
+    dateSource?.value || mapped.deliveryDate || text,
   );
   const range = text.match(
     /(\d{1,2}:\d{2})\s*[~～\-]\s*(\d{1,2})\s*:?\s*(\d{2})/,
   );
-  const deliveryWindowStart = range ? normalizeTime(range[1]) : '';
+  const deliveryWindowStart = range ? normalizeReceiptTime(range[1]) : '';
   const deliveryWindowEnd = range
-    ? normalizeTime(`${range[2]}:${range[3]}`)
+    ? normalizeReceiptTime(`${range[2]}:${range[3]}`)
     : '';
 
   const strictSource = findLabeledValue(lines, [
@@ -375,12 +446,12 @@ export function parseReceiptText(
   const eventSource =
     findLabeledValue(lines, ['예식 시간', '예식시간', '예식', '본식', '행사시간']) ||
     firstMatchingLine(lines, (line) =>
-      /\(\s*\d{1,2}시\s*\d{0,2}분?\s*식\s*\)/.test(line),
+      /예식\s*[:：]?\s*\d{1,2}시|\(\s*\d{1,2}시\s*\d{0,2}분?\s*식\s*\)/.test(line),
     );
   const strictTime = strictSource
-    ? normalizeTime(strictSource.value)
+    ? normalizeReceiptTime(strictSource.value)
     : '';
-  const eventTime = eventSource ? normalizeTime(eventSource.value) : '';
+  const eventTime = eventSource ? normalizeReceiptTime(eventSource.value) : '';
 
   const venueSource = findLabeledValue(lines, [
     '업체명',
@@ -400,7 +471,7 @@ export function parseReceiptText(
     '수령인',
     '인수자',
   ]);
-  const recipientName = safeRecipientName(recipientSource?.value || '');
+  const recipientName = safeReceiptRecipientName(recipientSource?.value || '');
   const recipientTelSource = validatedPhoneCandidate(
     findLabeledValue(lines, [
       '수령인 전화',
@@ -489,7 +560,7 @@ export function parseReceiptText(
     ),
     field(
       'productQuantity',
-      normalizeQuantity(quantitySource?.value || ''),
+      normalizeReceiptQuantity(quantitySource?.value || ''),
       quantitySource ? 78 : 0,
       quantitySource?.sourceText || '',
       [],
@@ -515,9 +586,10 @@ export function parseReceiptText(
       'deliveryDate',
       deliveryDate,
       deliveryDate ? 92 : 0,
-      mapped.deliveryDate || '',
+      dateSource?.sourceText || mapped.deliveryDate || '',
       [],
       {
+        sourceLineIds: dateSource?.sourceLineIds,
         extractionMethod: deliveryDate ? 'pattern' : undefined,
         forceReview: !mapped.deliveryDate,
       },

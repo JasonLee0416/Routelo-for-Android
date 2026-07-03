@@ -7,26 +7,36 @@ const withVerification = (on: boolean): RouteloSettings => ({
 });
 
 describe('vendorDirectoryFor', () => {
-  const KEY = 'EXPO_PUBLIC_KAKAO_REST_API_KEY';
-  const original = process.env[KEY];
+  const GOOGLE_KEY = 'EXPO_PUBLIC_GOOGLE_PLACES_API_KEY';
+  const LEGACY_KAKAO_KEY = 'EXPO_PUBLIC_KAKAO_REST_API_KEY';
+  const originalGoogle = process.env[GOOGLE_KEY];
+  const originalKakao = process.env[LEGACY_KAKAO_KEY];
 
   afterEach(() => {
-    if (original === undefined) delete process.env[KEY];
-    else process.env[KEY] = original;
+    if (originalGoogle === undefined) delete process.env[GOOGLE_KEY];
+    else process.env[GOOGLE_KEY] = originalGoogle;
+    if (originalKakao === undefined) delete process.env[LEGACY_KAKAO_KEY];
+    else process.env[LEGACY_KAKAO_KEY] = originalKakao;
   });
 
-  it('is disabled (null) when the toggle is OFF, even with a key', () => {
-    process.env[KEY] = 'KEY';
+  it('is disabled when the toggle is OFF, even with a Google key', () => {
+    process.env[GOOGLE_KEY] = 'KEY';
     expect(vendorDirectoryFor(withVerification(false)).id).toBe('null');
   });
 
-  it('is disabled (null) when ON but no key is present', () => {
-    delete process.env[KEY];
+  it('is disabled when ON but no Google key is present', () => {
+    delete process.env[GOOGLE_KEY];
     expect(vendorDirectoryFor(withVerification(true)).id).toBe('null');
   });
 
-  it('uses the Kakao directory when ON and a key is present', () => {
-    process.env[KEY] = 'KEY';
-    expect(vendorDirectoryFor(withVerification(true)).id).toBe('kakao-local');
+  it('uses Google Places when ON and a Google key is present', () => {
+    process.env[GOOGLE_KEY] = 'KEY';
+    expect(vendorDirectoryFor(withVerification(true)).id).toBe('google-places');
+  });
+
+  it('does not use the legacy Kakao key after Google-only roadmap alignment', () => {
+    delete process.env[GOOGLE_KEY];
+    process.env[LEGACY_KAKAO_KEY] = 'LEGACY';
+    expect(vendorDirectoryFor(withVerification(true)).id).toBe('null');
   });
 });

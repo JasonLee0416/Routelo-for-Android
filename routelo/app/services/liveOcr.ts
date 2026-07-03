@@ -164,9 +164,16 @@ export function updateLiveOcrSession(
 
     const sameValue =
       normalizeCandidate(candidate.value) === normalizeCandidate(current.value);
+    const weakerDifferentCandidate =
+      current.value &&
+      !sameValue &&
+      candidate.confidence <= current.confidence;
+    if (weakerDifferentCandidate) continue;
+
     const supportCount = sameValue ? current.supportCount + 1 : 1;
     const confidence = Math.max(current.confidence, candidate.confidence);
-    const status = supportCount >= REQUIRED_SUPPORT_COUNT ? 'locked' : 'candidate';
+    const status =
+      supportCount >= REQUIRED_SUPPORT_COUNT ? 'locked' : 'candidate';
 
     nextFields[definition.id] = {
       ...current,
@@ -268,10 +275,10 @@ export function liveOcrScannerStepLabel(
 export function liveOcrIncompleteMessage(session: LiveOcrSessionState): string {
   const summary = summarizeLiveOcrSession(session);
   if (!session.lastFrameAccepted) {
-    return '이번 프레임에서는 상호명·주소·전화번호 후보를 안정적으로 찾지 못했습니다. 인수증 전체가 밝고 흔들리지 않게 보이도록 다시 촬영해 주세요.';
+    return '이번 프레임에서는 상호명, 주소, 전화번호 후보를 안정적으로 찾지 못했습니다. 인수증 전체가 밝고 흔들리지 않게 보이도록 다시 촬영해 주세요.';
   }
   return summary.remainingCount
-    ? `인식된 항목은 고정했습니다. 남은 ${summary.remainingCount}개 항목을 채우려면 인수증을 더 가까이 맞추고 다음 프레임을 촬영해 주세요.`
+    ? `인식된 항목은 누적했습니다. 남은 ${summary.remainingCount}개 항목을 채우려면 인수증을 더 가까이 맞추고 다음 프레임을 촬영해 주세요.`
     : '필수 인식 항목이 모두 고정되었습니다. 추출 결과를 검토해 주세요.';
 }
 

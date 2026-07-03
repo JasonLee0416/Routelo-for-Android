@@ -73,7 +73,7 @@ export type AppearanceSettings = {
   listDensity: 'comfortable' | 'compact';
 };
 
-export type NavApp = 'tmap' | 'kakao' | 'naver';
+export type NavApp = 'google' | 'tmap' | 'naver';
 
 export type RoutePreferenceSettings = {
   routeMode: 'deadline-first' | 'distance-first' | 'profit-first' | 'manual';

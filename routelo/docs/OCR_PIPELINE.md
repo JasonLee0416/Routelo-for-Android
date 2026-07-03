@@ -1,157 +1,126 @@
 # RouteLO OCR Pipeline
 
-> Current architecture as of 2026-06-24: RouteLO uses one pinned PP-OCRv5
-> detector and Korean recognizer through the shared ONNX Runtime React Native
-> path on Android and iOS. References to ML Kit below describe the superseded
-> baseline and are retained only for historical benchmark context. The current
-> decision is recorded in `docs/adr/0001-ppocr-single-engine.md`.
+> Current architecture: RouteLO uses a pinned PP-OCRv5 detector and Korean
+> recognizer through ONNX Runtime React Native. Google ML Kit is no longer a
+> production dependency. The shared parser must normalize text into RouteLO
+> receipt fields without fabricating unsupported values.
 
-## 1. Recommended architecture
-
-```text
-CameraX / Expo camera
-  → capture quality gate
-  → document detection and perspective correction
-  → six preprocessing variants
-  → on-device OCR (Google ML Kit)
-  → block/line/word spatial analysis
-  → Korean field candidate extraction
-  → confidence scoring and cross-field validation
-  → low-confidence cloud fallback (CLOVA OCR or Cloud Vision)
-  → field-level result merge
-  → user review
-  → encrypted local storage and correction feedback
-```
-
-The production Android build should use Google ML Kit Korean text recognition as the fast first pass. Only documents or required fields below the confidence threshold should be sent to a server OCR provider. This keeps common scans fast, inexpensive, and available offline.
-
-## 2. Capture quality gate
-
-OCR must not start when a required quality condition fails.
-
-- Blur: Laplacian variance or ML-based sharpness score.
-- Brightness: mean luminance and clipped black/white pixel ratio.
-- Shadow: local illumination variance across document quadrants.
-- Coverage: detected document polygon relative to the camera frame.
-- Cropping: polygon points touching the frame boundary.
-- Skew: document edge angles and text baseline angle.
-- Resolution: effective character height and document pixel area.
-
-Suggested automatic capture conditions:
-
-- document coverage 65–92%
-- all four corners visible
-- blur score at least 70
-- brightness score at least 65
-- skew under 8 degrees
-- stable device motion for 400–600 ms
-
-## 3. Preprocessing variants
-
-Preserve the original image and generate independent OCR candidates:
-
-1. original crop
-2. illumination-corrected image
-3. CLAHE contrast image
-4. perspective and deskew corrected image
-5. adaptive-threshold image
-6. denoised and sharpened image
-
-Do not select a single image globally. Select the best OCR block or field candidate across variants. Avoid aggressive binarization when thin Korean strokes disappear.
-
-## 4. OCR engines
-
-| Engine | Korean | Offline | Cost | Recommended role |
-|---|---:|---:|---:|---|
-| Google ML Kit | good | yes | free | primary mobile OCR |
-| Tesseract | medium | yes | free | optional offline fallback |
-| Google Cloud Vision | very good | no | paid | low-confidence retry |
-| Naver CLOVA OCR | very good | no | paid | Korean form/template retry |
-| Other cloud OCR | varies | no | paid | provider-specific fallback |
-
-For production, replace the demo engine adapter in `app/services/ocr.ts` with:
-
-- Android native development build: ML Kit block/line/element results.
-- Server fallback: CLOVA OCR or Cloud Vision when document confidence is below 72 or a required field is below 60.
-
-## 5. Candidate scoring
-
-Each field receives a 0–100 score.
+## 1. Production pipeline
 
 ```text
-score =
-  OCR confidence × 0.20
-  + regex validity (0–20)
-  + keyword proximity (0–25)
-  + document position (0–10)
-  + cross-field consistency (0–15)
-  + external validation (0–20)
-  - ambiguity penalty (0–20)
-  - logical error penalty (0–40)
+Camera / gallery frame
+  -> capture quality gate
+  -> optional receipt-region crop, rotation, and perspective normalization
+  -> on-device PP-OCRv5 detector + Korean recognizer
+  -> layout reconstruction
+  -> normalizeReceipt / parseReceiptText
+  -> field confidence + provenance scoring
+  -> optional Google Places vendor verification, default OFF
+  -> user review
+  -> delivery registration only after user confirmation
 ```
 
-- 85–100: confirmed automatically
-- 60–84: user review
-- 40–59: strong warning
-- below 40: do not auto-fill
+The first production rule is zero fabrication: missing OCR evidence must remain
+missing or review-required. The app must never replace an unavailable OCR value
+with a demo fixture, guessed phone number, guessed address, or generated vendor.
 
-Document confidence is the weighted average of required fields, with the lowest required-field score receiving extra weight.
+## 2. Live camera accumulation
 
-## 6. Field extraction rules
+The current Expo flow still captures frames through ImagePicker, so true camera
+preview sampling requires a native camera adapter. The app-level accumulator is
+already designed around the future native flow:
 
-- Strict deadline: nearest time to 배달 엄수, 도착, 배송, 납품, 마감, 까지.
-- Event time: nearest time to 예식, 본식, 웨딩, 행사, 예약 시간.
-- Date: nearest date to 배송일, 배달일, 납품일, 예식일; infer current year when absent.
-- Phone: normalize mobile and landline formats; prioritize 수령자/담당자 context.
-- Address: detect Korean administrative and road-name tokens, then validate with a map/address search provider.
-- Venue: prioritize large top-area text and 예식장, 웨딩, 컨벤션, 호텔, 홀, 센터 keywords.
-- Recipient: prioritize 수령자, 담당자, 인수자, 받는 분, 고객명.
-- Order number: prioritize 주문번호, 접수번호, 관리번호, No., Order, Code and exclude dates/phones.
-- Memo: collect text following 특이사항, 요청사항, 메모, 주의, 비고, 전달사항 until the next field.
+1. sample an accepted frame;
+2. run quality checks;
+3. run local OCR;
+4. map fields with confidence;
+5. update rolling field candidates only when the new evidence is stronger;
+6. lock the three minimum scan fields after repeated stable evidence;
+7. move to review, not auto-save.
 
-Logical validation should normally enforce `strict deadline < event time`.
+Minimum live-scan checklist:
 
-## 7. Review UI
+- merchant / ordering vendor name;
+- address / delivery destination;
+- phone number candidate.
 
-The implemented review flow uses:
+Each item starts missing. It becomes a candidate after one strong frame and
+locked only after at least two stable supporting frames. Phone candidates must
+pass phone-format validation. Lower-confidence different candidates cannot
+overwrite stronger existing evidence.
 
-- green check for 85+
-- amber review state for 60–84
-- red warning for below 60 or missing values
-- original source text under every field
-- alternative candidate chips
-- editable inputs
-- required-field validation before save
+## 3. OCR benchmark loop
 
-Production native builds should additionally draw OCR bounding boxes over the source image and zoom to a field's source box when tapped.
+The repository benchmark lives outside the mobile bundle:
 
-## 8. Database tables
+```text
+benchmarks/ocr/receipt-samples/
+  images/
+  golden/raw_golden_answer_text/
+  manifest.json
+  scripts/
+```
 
-- `delivery_receipts`: receipt metadata, image hashes, status, created time.
-- `ocr_raw_results`: engine, variant, raw blocks, confidence, processing time.
-- `extracted_fields`: selected value, confidence, validation status.
-- `field_candidates`: all candidate values, bounding boxes, evidence scores.
-- `user_corrections`: predicted value, corrected value, anonymized context.
-- `receipt_templates`: vendor/template fingerprint and learned field regions.
-- `address_candidates`: OCR address, normalized address, coordinates, validation score.
+Validation commands:
 
-Relations: one receipt has many raw results, extracted fields, candidates, corrections, and address candidates. Templates are associated by vendor and visual fingerprint.
+```bash
+cd benchmarks/ocr/receipt-samples
+node scripts/validate-dataset.mjs
+node scripts/evaluate-text-candidate.mjs \
+  --candidate-name golden-self-check \
+  --predictions-dir golden/raw_golden_answer_text \
+  --max-normalized-cer 0
+```
 
-## 9. Privacy and learning
+App parser tests now read this golden text dataset and verify both extraction
+quality and anti-fabrication behavior.
 
-- Encrypt receipt images and structured personal data at rest.
-- Hash or tokenize phone numbers and addresses in correction analytics.
-- Store bounding boxes and keyword features without retaining full sensitive text when possible.
-- Learn vendor-specific label aliases and approximate field regions.
-- Require explicit retention and cloud-upload consent.
+## 4. OCR accuracy improvement order
 
-## 10. MVP priority
+Before increasing model size, improve the image and post-processing pipeline:
 
-1. capture quality gate
-2. ML Kit first-pass OCR
-3. Korean regex/context parser
-4. confidence review UI
-5. required-field validation
-6. address candidate validation
-7. low-confidence cloud fallback
-8. encrypted correction feedback and template learning
+1. orientation candidates or orientation classification;
+2. receipt/paper region detection;
+3. perspective-corrected text-line crops;
+4. real DB polygon post-processing;
+5. field-level accumulation across frames;
+6. only then compare larger or alternate OCR models.
+
+This order keeps APK size and device load under control while addressing the
+highest-probability causes of Korean receipt OCR failure.
+
+## 5. Field extraction and review rules
+
+- Dates must support both `YYYY-MM-DD` and Korean forms such as
+  `2026년 06월 14일`.
+- Times must support `HH:mm` and Korean forms such as `12시20분`.
+- Event time is extracted from explicit event/wedding labels such as `예식`.
+- Product quantity can come from `수량`, `개`, or flower stand expressions such
+  as `축하3단`.
+- Phone fields require a valid Korean mobile or landline pattern.
+- Recipient phone ownership is never inferred from an unlabeled phone line.
+- Address and vendor values remain review-required unless confidence and source
+  evidence are strong.
+
+Review UI remains responsible for final user confirmation, correction, vendor
+verification display, and save.
+
+## 6. Google Places vendor verification
+
+Vendor verification is optional and default OFF. When enabled, the provider is
+Google Places via `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY`.
+
+Network guardrails:
+
+- send only a sanitized business-name query;
+- reject mixed OCR lines containing phone/address/recipient-looking fragments;
+- attach verification as provenance only;
+- never auto-select or auto-overwrite user-visible receipt fields.
+
+## 7. Privacy
+
+- Preserve raw OCR text only when the privacy setting allows it.
+- Keep source evidence lines for review and debugging.
+- Do not send recipient names, recipient phones, full addresses, or mixed OCR
+  blocks to external vendor verification.
+- Treat benchmark images in the repository as fictional test material.

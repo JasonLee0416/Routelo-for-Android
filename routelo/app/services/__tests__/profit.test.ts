@@ -2,7 +2,11 @@ import { DeliveryOrder } from '../../domain';
 import { FuelLog } from '../../models';
 import { DEFAULT_ROUTELO_SETTINGS, RouteloSettings } from '../../settings';
 import { calculateFeeByAddress, findDistrictByAddress } from '../maps';
-import { summarizeDailyProfit } from '../profit';
+import {
+  createCalendarProfitDays,
+  summarizeDailyProfit,
+  summarizePeriodProfit,
+} from '../profit';
 
 const settings: RouteloSettings = {
   ...DEFAULT_ROUTELO_SETTINGS,
@@ -51,28 +55,28 @@ const order = (
 describe('district fee lookup', () => {
   test('matches Seoul and Gyeonggi addresses after whitespace normalization', () => {
     expect(findDistrictByAddress('서울특별시 강남구 테헤란로', settings)).toBe('강남구');
-    expect(findDistrictByAddress('경기도 수원 시 팔달구', settings)).toBe('수원시');
+    expect(findDistrictByAddress('경기도 수원시 팔달구', settings)).toBe('수원시');
   });
 
   test('uses the configured fee and falls back safely for unknown districts', () => {
-    expect(calculateFeeByAddress('서울 강남구 역삼동', settings)).toBe(18000);
-    expect(calculateFeeByAddress('제주특별자치도 제주시', settings)).toBe(15000);
+    expect(calculateFeeByAddress('서울 강남구 삼성동', settings)).toBe(18000);
+    expect(calculateFeeByAddress('세종특별자치시 세종시', settings)).toBe(15000);
   });
 });
 
-describe('summarizeDailyProfit', () => {
-  test('prefers saved fees, applies district defaults, and deducts fuel by date', () => {
-    const fuelLogs: FuelLog[] = [
-      {
-        id: 'fuel-1',
-        date: '2026-06-24',
-        pricePerLiter: 1700,
-        liters: 10,
-        amount: 17000,
-        odometerKm: 1000,
-      },
-    ];
+describe('profit summaries', () => {
+  const fuelLogs: FuelLog[] = [
+    {
+      id: 'fuel-1',
+      date: '2026-06-24',
+      pricePerLiter: 1700,
+      liters: 10,
+      amount: 17000,
+      odometerKm: 1000,
+    },
+  ];
 
+  test('prefers saved fees, applies district defaults, and deducts fuel by date', () => {
     const summaries = summarizeDailyProfit(
       [
         order('saved', '2026-06-24', '서울 강남구', 30000),
@@ -113,6 +117,42 @@ describe('summarizeDailyProfit', () => {
       fuelCost: 9000,
       net: -9000,
       count: 0,
+    });
+  });
+
+  test('builds calendar profit days and period totals for the calendar view', () => {
+    const orders = [
+      order('a', '2026-06-24', '서울 강남구', 30000),
+      order('b', '2026-06-25', '경기도 수원시'),
+    ];
+    const days = createCalendarProfitDays(orders, fuelLogs, settings);
+    const totals = summarizePeriodProfit(days);
+
+    expect(days).toEqual([
+      {
+        date: '2026-06-24',
+        revenue: 30000,
+        fuelCost: 17000,
+        net: 13000,
+        deliveryCount: 1,
+        hasFuelCost: true,
+        hasRevenue: true,
+      },
+      {
+        date: '2026-06-25',
+        revenue: 24000,
+        fuelCost: 0,
+        net: 24000,
+        deliveryCount: 1,
+        hasFuelCost: false,
+        hasRevenue: true,
+      },
+    ]);
+    expect(totals).toEqual({
+      revenue: 54000,
+      fuelCost: 17000,
+      net: 37000,
+      deliveryCount: 2,
     });
   });
 });

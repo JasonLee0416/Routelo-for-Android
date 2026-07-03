@@ -40,22 +40,13 @@
       },
       "parser": {
         "documentConfidence": 27,
-        "populatedFieldCount": 2,
+        "populatedFieldCount": 3,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
         "rawFallbackFieldCount": 0,
         "unmappedLineCount": 32,
         "fields": [
-          {
-            "key": "orderNumber",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
-            "semanticRisks": []
-          },
           {
             "key": "orderingVendorName",
             "value": "",
@@ -103,11 +94,11 @@
           },
           {
             "key": "productQuantity",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "3",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "축하 - 축하3단",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -238,15 +229,6 @@
         "rawFallbackFieldCount": 0,
         "unmappedLineCount": 22,
         "fields": [
-          {
-            "key": "orderNumber",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
-            "semanticRisks": []
-          },
           {
             "key": "orderingVendorName",
             "value": "",
@@ -421,23 +403,14 @@
         "nonEmpty": true
       },
       "parser": {
-        "documentConfidence": 55,
+        "documentConfidence": 86,
         "populatedFieldCount": 5,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
         "rawFallbackFieldCount": 0,
-        "unmappedLineCount": 24,
+        "unmappedLineCount": 25,
         "fields": [
-          {
-            "key": "orderNumber",
-            "value": "202606-260614-best2308-0003",
-            "confidence": 90,
-            "status": "confirmed",
-            "sourceText": "주문서 No : 202606-260614-best2308-0003",
-            "provenance": "sourceText",
-            "semanticRisks": []
-          },
           {
             "key": "orderingVendorName",
             "value": "",
@@ -503,11 +476,11 @@
           },
           {
             "key": "deliveryDate",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "2026-06-14",
+            "confidence": 92,
+            "status": "review",
+            "sourceText": "|2026년 06월 14일 (일요일) 지금즉시배송 디카촬영요청 해피",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -612,23 +585,14 @@
         "nonEmpty": true
       },
       "parser": {
-        "documentConfidence": 55,
+        "documentConfidence": 86,
         "populatedFieldCount": 5,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
         "rawFallbackFieldCount": 0,
-        "unmappedLineCount": 22,
+        "unmappedLineCount": 23,
         "fields": [
-          {
-            "key": "orderNumber",
-            "value": "202606-260614-best5",
-            "confidence": 90,
-            "status": "confirmed",
-            "sourceText": "주문서 No : 202606-260614-best5 402-0001",
-            "provenance": "sourceText",
-            "semanticRisks": []
-          },
           {
             "key": "orderingVendorName",
             "value": "",
@@ -694,11 +658,11 @@
           },
           {
             "key": "deliveryDate",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "2026-06-14",
+            "confidence": 92,
+            "status": "review",
+            "sourceText": "2026년 06월 14일 (일요일) 지금족시배송 디카촬영요청 해피를",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -803,23 +767,14 @@
         "nonEmpty": true
       },
       "parser": {
-        "documentConfidence": 27,
+        "documentConfidence": 58,
         "populatedFieldCount": 3,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
         "rawFallbackFieldCount": 0,
-        "unmappedLineCount": 30,
+        "unmappedLineCount": 31,
         "fields": [
-          {
-            "key": "orderNumber",
-            "value": "260614-0371>",
-            "confidence": 90,
-            "status": "confirmed",
-            "sourceText": "260614-0371>",
-            "provenance": "sourceText",
-            "semanticRisks": []
-          },
           {
             "key": "orderingVendorName",
             "value": "",
@@ -885,11 +840,11 @@
           },
           {
             "key": "deliveryDate",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "2026-06-14",
+            "confidence": 92,
+            "status": "review",
+            "sourceText": "|2026년 06월 14일 요일 17시 00분 까지 배송 ()",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -995,22 +950,13 @@
       },
       "parser": {
         "documentConfidence": 0,
-        "populatedFieldCount": 1,
+        "populatedFieldCount": 0,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
         "rawFallbackFieldCount": 0,
-        "unmappedLineCount": 27,
+        "unmappedLineCount": 28,
         "fields": [
-          {
-            "key": "orderNumber",
-            "value": "202606-260614-ran318-0001",
-            "confidence": 90,
-            "status": "confirmed",
-            "sourceText": "NO : 202606-260614-ran318-0001",
-            "provenance": "sourceText",
-            "semanticRisks": []
-          },
           {
             "key": "orderingVendorName",
             "value": "",
@@ -1191,17 +1137,8 @@
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
         "rawFallbackFieldCount": 0,
-        "unmappedLineCount": 29,
+        "unmappedLineCount": 30,
         "fields": [
-          {
-            "key": "orderNumber",
-            "value": "202606-260614-hanll-0003",
-            "confidence": 90,
-            "status": "confirmed",
-            "sourceText": "NO: 202606-260614-hanll-0003",
-            "provenance": "sourceText",
-            "semanticRisks": []
-          },
           {
             "key": "orderingVendorName",
             "value": "",
@@ -1249,11 +1186,11 @@
           },
           {
             "key": "productQuantity",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "3",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "근조 - 3단",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -1270,7 +1207,7 @@
             "value": "",
             "confidence": 0,
             "status": "missing",
-            "sourceText": "",
+            "sourceText": "배달일시 |2026년",
             "provenance": "missing",
             "semanticRisks": []
           },
@@ -1384,15 +1321,6 @@
         "rawFallbackFieldCount": 0,
         "unmappedLineCount": 27,
         "fields": [
-          {
-            "key": "orderNumber",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
-            "semanticRisks": []
-          },
           {
             "key": "orderingVendorName",
             "value": "",
