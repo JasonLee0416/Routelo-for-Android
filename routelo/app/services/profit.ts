@@ -10,6 +10,23 @@ export type DailyProfitSummary = {
   count: number;
 };
 
+export type CalendarProfitDay = {
+  date: string;
+  revenue: number;
+  fuelCost: number;
+  net: number;
+  deliveryCount: number;
+  hasRevenue: boolean;
+  hasFuelCost: boolean;
+};
+
+export type PeriodProfitSummary = {
+  revenue: number;
+  fuelCost: number;
+  net: number;
+  deliveryCount: number;
+};
+
 const emptySummary = (): DailyProfitSummary => ({
   revenue: 0,
   fuelCost: 0,
@@ -49,4 +66,41 @@ export function summarizeDailyProfit(
   });
 
   return grouped;
+}
+
+export function createCalendarProfitDays(
+  orders: DeliveryOrder[],
+  fuelLogs: FuelLog[],
+  settings: RouteloSettings,
+): CalendarProfitDay[] {
+  return [...summarizeDailyProfit(orders, fuelLogs, settings).entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, summary]) => ({
+      date,
+      revenue: summary.revenue,
+      fuelCost: summary.fuelCost,
+      net: summary.net,
+      deliveryCount: summary.count,
+      hasRevenue: summary.revenue > 0,
+      hasFuelCost: summary.fuelCost > 0,
+    }));
+}
+
+export function summarizePeriodProfit(
+  days: CalendarProfitDay[],
+): PeriodProfitSummary {
+  return days.reduce(
+    (total, day) => ({
+      revenue: total.revenue + day.revenue,
+      fuelCost: total.fuelCost + day.fuelCost,
+      net: total.net + day.net,
+      deliveryCount: total.deliveryCount + day.deliveryCount,
+    }),
+    {
+      revenue: 0,
+      fuelCost: 0,
+      net: 0,
+      deliveryCount: 0,
+    },
+  );
 }

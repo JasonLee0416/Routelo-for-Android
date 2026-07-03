@@ -1,5 +1,5 @@
 import { RouteloSettings } from '../settings';
-import { resolveVendorDirectory } from './kakao';
+import { resolveVendorDirectory } from './google';
 import { VendorDirectory } from './types';
 
 // 설정 토글(옵트인) + 환경변수 키가 모두 있을 때만 실제 카카오 디렉터리를 돌려준다.
@@ -11,6 +11,6 @@ export function vendorDirectoryFor(settings: RouteloSettings): VendorDirectory {
     return resolveVendorDirectory();
   }
   return resolveVendorDirectory({
-    kakaoRestApiKey: process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY,
+    googlePlacesApiKey: process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY,
   });
 }

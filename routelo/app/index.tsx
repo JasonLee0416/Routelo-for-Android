@@ -1423,7 +1423,7 @@ function SettingsScreen({
           caption="경로 안내를 넘길 앱을 선택합니다"
         />
         <View style={styles.navAppOptions}>
-          {(['tmap', 'kakao', 'naver'] as NavApp[]).map((app) => {
+          {(['google', 'tmap', 'naver'] as NavApp[]).map((app) => {
             const active = settings.route.navApp === app;
             return (
               <Pressable

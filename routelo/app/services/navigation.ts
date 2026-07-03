@@ -3,8 +3,8 @@ import { Linking } from 'react-native';
 import { NavApp } from '../settings';
 
 export const NAV_APP_LABEL: Record<NavApp, string> = {
+  google: 'Google Maps',
   tmap: '티맵',
-  kakao: '카카오맵',
   naver: '네이버 지도',
 };
 
@@ -21,11 +21,11 @@ export function navDeepLink(app: NavApp, target: NavTarget): string {
   const name = encodeURIComponent(target.name);
   const { latitude: lat, longitude: lng } = target;
   switch (app) {
+    case 'google':
+      return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
     case 'tmap':
       // tmap: goalx=경도(lng), goaly=위도(lat)
       return `tmap://route?goalname=${name}&goalx=${lng}&goaly=${lat}`;
-    case 'kakao':
-      return `kakaomap://route?ep=${lat},${lng}&by=CAR`;
     case 'naver':
       return `nmap://route/car?dlat=${lat}&dlng=${lng}&dname=${name}&appname=${APP_PACKAGE}`;
   }
@@ -35,8 +35,8 @@ export function navDeepLink(app: NavApp, target: NavTarget): string {
 export function navWebFallback(app: NavApp, target: NavTarget): string {
   const name = encodeURIComponent(target.name);
   switch (app) {
-    case 'kakao':
-      return `https://map.kakao.com/link/to/${name},${target.latitude},${target.longitude}`;
+    case 'google':
+      return `https://www.google.com/maps/search/?api=1&query=${target.latitude},${target.longitude}`;
     case 'naver':
     case 'tmap':
       // 티맵은 웹 길안내가 없어 지도 검색으로 폴백한다.

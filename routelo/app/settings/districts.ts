@@ -75,4 +75,3 @@ export const DEFAULT_FEE_SETTINGS: FeeSettings = {
   vehicleModel: '현대 포터2',
   fuelTankCapacity: 65,
 };
-

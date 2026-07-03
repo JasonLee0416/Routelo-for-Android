@@ -91,6 +91,20 @@ describe('live OCR session accumulator', () => {
     expect(session.readyForReview).toBe(false);
   });
 
+  it('does not let a later weaker different candidate overwrite a stronger candidate', () => {
+    const first = updateLiveOcrSession(
+      createInitialLiveOcrSession(),
+      result([field('deliveryAddress', '서울 강남구 테헤란로 1', 88)]),
+    );
+    const second = updateLiveOcrSession(
+      first,
+      result([field('deliveryAddress', '서울 강남구 테헤란로', 82)]),
+    );
+
+    expect(second.fields.address.value).toBe('서울 강남구 테헤란로 1');
+    expect(second.fields.address.supportCount).toBe(1);
+  });
+
   it('rejects frames that do not add stable live OCR evidence', () => {
     const session = updateLiveOcrSession(
       createInitialLiveOcrSession(),
@@ -107,7 +121,7 @@ describe('live OCR session accumulator', () => {
       '1개 프레임 재촬영 필요',
     );
     expect(liveOcrIncompleteMessage(session)).toContain(
-      '후보를 안정적으로 찾지 못했습니다',
+      '안정적으로 찾지 못했습니다',
     );
   });
 
@@ -124,11 +138,11 @@ describe('live OCR session accumulator', () => {
   it('builds the vendor verification query from ordering vendor or venue evidence', () => {
     expect(
       liveOcrReviewQuery([
-        field('venueName', '라움아트센터', 90),
+        field('venueName', '더채플웨딩홀', 90),
         field('recipientTel', '02-123-4567', 82),
       ]),
     ).toEqual({
-      vendorName: '라움아트센터',
+      vendorName: '더채플웨딩홀',
       vendorPhone: '02-123-4567',
     });
   });

@@ -5,6 +5,7 @@ import {
 import { DEFAULT_ROUTELO_SETTINGS } from './defaults';
 import {
   LegacyFeeSettings,
+  NavApp,
   RouteloSettings,
   SETTINGS_SCHEMA_VERSION,
 } from './schema';
@@ -17,6 +18,11 @@ const finiteNumber = (value: unknown, fallback: number) =>
 
 const cloneDefaults = (): RouteloSettings =>
   JSON.parse(JSON.stringify(DEFAULT_ROUTELO_SETTINGS)) as RouteloSettings;
+
+const normalizeNavApp = (value: unknown): NavApp =>
+  value === 'google' || value === 'tmap' || value === 'naver'
+    ? value
+    : DEFAULT_ROUTELO_SETTINGS.route.navApp;
 
 const mergeRecord = <T extends Record<string, unknown>>(
   defaults: T,
@@ -72,7 +78,12 @@ export function mergeSettingsV2(stored?: unknown): RouteloSettings {
       DEFAULT_ROUTELO_SETTINGS.appearance,
       stored.appearance,
     ),
-    route: mergeRecord(DEFAULT_ROUTELO_SETTINGS.route, stored.route),
+    route: {
+      ...mergeRecord(DEFAULT_ROUTELO_SETTINGS.route, stored.route),
+      navApp: normalizeNavApp(
+        isRecord(stored.route) ? stored.route.navApp : undefined,
+      ),
+    },
     account: mergeRecord(DEFAULT_ROUTELO_SETTINGS.account, stored.account),
   } as RouteloSettings;
 }

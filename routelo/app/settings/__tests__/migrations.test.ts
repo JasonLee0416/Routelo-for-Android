@@ -60,6 +60,15 @@ describe('settings v2 migration', () => {
     );
   });
 
+  it('normalizes legacy Kakao navigation settings to Google Maps', () => {
+    const merged = mergeSettingsV2({
+      schemaVersion: 2,
+      route: { navApp: 'kakao' },
+    });
+
+    expect(merged.route.navApp).toBe('google');
+  });
+
   it('migrates once and persists the v2 payload', async () => {
     const store = new MemoryStore();
     store.values.set(
