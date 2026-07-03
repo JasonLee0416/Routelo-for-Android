@@ -4,6 +4,7 @@ import {
   androidNativePpocrFrameRecognizerStatusLabel,
   createAndroidNativePpocrFrameRecognizer,
   inspectAndroidNativePpocrFrameRecognizer,
+  loadAndroidNativePpocrFrameRecognizerBinding,
 } from '../androidNativePpocrFrameRecognizer';
 
 const metadata = {
@@ -100,6 +101,74 @@ describe('Android native PP-OCR frame recognizer bridge', () => {
     expect(recognizeFrame).toHaveBeenCalledTimes(1);
   });
 
+  test('keeps a bundled scaffold unavailable until frame-buffer recognition is ready', async () => {
+    const recognizer = createAndroidNativePpocrFrameRecognizer(
+      {
+        frameBufferRecognitionReady: false,
+        recognizeFrame: jest.fn(),
+      },
+      {
+        enabled: true,
+      },
+    );
+
+    expect(recognizer.state).toEqual({
+      enabled: true,
+      bundled: true,
+      ready: false,
+      reason:
+        'Android native PP-OCR binding is bundled, but direct VisionCamera frame-buffer recognition is not implemented yet.',
+    });
+    await expect(
+      recognizer.recognizeFrame({
+        frame: {},
+        metadata,
+      }),
+    ).rejects.toThrow('direct VisionCamera frame-buffer recognition');
+  });
+
+  test('loads the Android native module scaffold as bundled but not ready', async () => {
+    const recognizeFrameMetadata = jest.fn();
+    const binding = loadAndroidNativePpocrFrameRecognizerBinding({
+      platform: 'android',
+      nativeModules: {
+        RouteloAndroidPpocrFrameRecognizer: {
+          frameBufferRecognitionReady: false,
+          implementationStage: 'native-module-scaffold',
+          recognizeFrameMetadata,
+        },
+      },
+    });
+
+    expect(binding).toMatchObject({
+      frameBufferRecognitionReady: false,
+      implementationStage: 'native-module-scaffold',
+    });
+    expect(
+      inspectAndroidNativePpocrFrameRecognizer({
+        binding,
+        enabled: true,
+      }),
+    ).toMatchObject({
+      bundled: true,
+      ready: false,
+    });
+  });
+
+  test('does not load the Android native module scaffold outside Android', () => {
+    expect(
+      loadAndroidNativePpocrFrameRecognizerBinding({
+        platform: 'ios',
+        nativeModules: {
+          RouteloAndroidPpocrFrameRecognizer: {
+            frameBufferRecognitionReady: true,
+            recognizeFrameMetadata: jest.fn(),
+          },
+        },
+      }),
+    ).toBeNull();
+  });
+
   test('summarizes Android native PP-OCR readiness', () => {
     expect(
       androidNativePpocrFrameRecognizerStatusLabel({
@@ -115,6 +184,13 @@ describe('Android native PP-OCR frame recognizer bridge', () => {
         ready: false,
       }),
     ).toBe('binding missing');
+    expect(
+      androidNativePpocrFrameRecognizerStatusLabel({
+        enabled: true,
+        bundled: true,
+        ready: false,
+      }),
+    ).toBe('bundled / not ready');
     expect(
       androidNativePpocrFrameRecognizerStatusLabel({
         enabled: true,

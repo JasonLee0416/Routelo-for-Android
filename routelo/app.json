@@ -34,7 +34,8 @@
     },
     "plugins": [
       "expo-font",
-      "onnxruntime-react-native"
+      "onnxruntime-react-native",
+      "./plugins/withAndroidPpocrFrameRecognizer"
     ]
   }
 }

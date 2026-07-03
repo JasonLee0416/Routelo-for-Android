@@ -48,10 +48,27 @@ save behavior shared across Android live OCR and still-photo OCR.
 ## Implementation sequence
 
 1. Add the shared native-frame recognizer contract and scanner ingestion path.
-2. Add Android native PP-OCR binding against VisionCamera frame buffers.
-3. Add device benchmark logging for real Android receipt samples.
-4. Consider CLOVA fallback only after the local native path reports missing
+2. Add a prebuild-safe Android native module scaffold so APK builds can bundle
+   the `RouteloAndroidPpocrFrameRecognizer` entrypoint without directly
+   committing generated Android edits.
+3. Replace the scaffold body with direct VisionCamera frame-buffer PP-OCR
+   processing and return only recognized OCR evidence to
+   `acceptRecognizedNativeFrame()`.
+4. Add device benchmark logging for real Android receipt samples.
+5. Consider CLOVA fallback only after the local native path reports missing
    required fields and the user has opted in.
+
+## Current scaffold status
+
+`plugins/withAndroidPpocrFrameRecognizer.js` injects an Android
+`ReactPackage` and `ReactContextBaseJavaModule` during Expo prebuild. The module
+reports that it is bundled, but also reports
+`frameBufferRecognitionReady=false` and rejects recognition calls with
+`E_ANDROID_PPOCR_FRAME_BUFFER_NOT_IMPLEMENTED`.
+
+That is deliberate. Until native PP-OCR can process a real VisionCamera frame
+buffer, the app must show the native entrypoint as present-but-not-ready and
+keep still-photo OCR as the safe fallback.
 
 ## Revisit triggers
 
