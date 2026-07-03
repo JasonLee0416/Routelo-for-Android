@@ -41,6 +41,10 @@ already designed around the future native flow:
 Current implementation status:
 
 - `LiveOcrFrameScanner` accepts frame assets from a future native camera source.
+- `liveCameraFrameSourceCapability()` is the platform gate for that source. It
+  reports Android/iOS as `native-adapter-missing` until a bundled native preview
+  frame adapter is registered, so the app cannot pretend live OCR is available
+  while only the ImagePicker still-photo flow exists.
 - It enforces a configurable sampling interval, initially suitable for the
   400-700 ms range discussed in #61.
 - It rejects poor-quality frames before OCR.
@@ -53,8 +57,11 @@ Current implementation status:
   last OCR latency.
 
 Still missing: the native camera preview adapter that supplies continuous frame
-assets. The engine is intentionally platform-neutral so Android and iOS can use
-the same accumulation policy once the adapter exists.
+assets. The adapter must implement the `LiveCameraFrameSource` contract, emit
+`LiveOcrFrameAsset` objects into `LiveOcrFrameScanner`, and keep still-photo OCR
+as the fallback when preview frames are unavailable. The engine is intentionally
+platform-neutral so Android and iOS can use the same accumulation policy once
+the adapter exists.
 
 Minimum live-scan checklist:
 
