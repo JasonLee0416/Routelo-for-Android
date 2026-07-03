@@ -62,7 +62,10 @@ export async function prepareDetectorImage(
   maxSide = 960,
 ): Promise<DetectorImage> {
   const original = await imageSize(uri);
-  const scale = Math.min(1, maxSide / Math.max(original.width, original.height));
+  const scale = Math.min(
+    1,
+    maxSide / Math.max(original.width, original.height),
+  );
   const width = Math.max(32, Math.ceil((original.width * scale) / 32) * 32);
   const height = Math.max(32, Math.ceil((original.height * scale) / 32) * 32);
   return {
@@ -85,7 +88,18 @@ export async function prepareRecognitionCrop(
     8,
     Math.min(targetWidth, Math.round((cropWidth * targetHeight) / cropHeight)),
   );
-  return manipulateToJpeg(uri, [
+  const topEdge = {
+    x: region.cornerPoints[1].x - region.cornerPoints[0].x,
+    y: region.cornerPoints[1].y - region.cornerPoints[0].y,
+  };
+  const skewDegrees = (Math.atan2(topEdge.y, topEdge.x) * 180) / Math.PI;
+  const deskewDegrees =
+    Number.isFinite(skewDegrees) &&
+    Math.abs(skewDegrees) >= 2 &&
+    Math.abs(skewDegrees) <= 25
+      ? -skewDegrees
+      : 0;
+  const actions: Action[] = [
     {
       crop: {
         originX: Math.max(0, Math.round(box.x)),
@@ -94,8 +108,12 @@ export async function prepareRecognitionCrop(
         height: cropHeight,
       },
     },
-    { resize: { width: scaledWidth, height: targetHeight } },
-  ]);
+  ];
+  if (deskewDegrees) {
+    actions.push({ rotate: deskewDegrees });
+  }
+  actions.push({ resize: { width: scaledWidth, height: targetHeight } });
+  return manipulateToJpeg(uri, actions);
 }
 
 export function detectorTensorData(image: DecodedJpeg): Float32Array {
