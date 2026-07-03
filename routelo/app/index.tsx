@@ -73,6 +73,10 @@ import {
   mergeOcrResult,
   updateLiveOcrSession,
 } from './services/liveOcr';
+import {
+  VisionCameraPreviewProbe,
+  visionCameraPreviewProbeEnabled,
+} from './platform/VisionCameraPreviewProbe';
 
 type TabKey =
   | 'home'
@@ -2326,6 +2330,9 @@ function OcrScannerModal({
               </View>
             </View>
             <LiveScanChecklist session={liveSession} />
+            {visionCameraPreviewProbeEnabled() ? (
+              <VisionCameraPreviewProbe isActive={visible && stage === 'capture'} />
+            ) : null}
             <View style={styles.captureTips}>
               <View style={styles.captureTip}>
                 <Ionicons name="sunny-outline" size={20} color={C.primary} />
