@@ -15,39 +15,51 @@ describe('native frame OCR recognizer contract', () => {
     });
   });
 
-  test('keeps Android unavailable until the native PP-OCR recognizer is bundled', () => {
+  test('keeps Android disabled until the Android native PP-OCR flag is enabled', () => {
     expect(nativeFrameOcrRecognizerCapability('android')).toMatchObject({
+      available: false,
+      status: 'disabled',
+      platform: 'android',
+      directFrameBuffer: true,
+      fallback: 'still-photo',
+      reason:
+        'Android native PP-OCR frame OCR is disabled. Still-photo OCR remains active.',
+    });
+  });
+
+  test('keeps Android unavailable until the native PP-OCR binding is bundled', () => {
+    expect(
+      nativeFrameOcrRecognizerCapability('android', false, true),
+    ).toMatchObject({
       available: false,
       status: 'native-recognizer-missing',
       platform: 'android',
       directFrameBuffer: true,
       fallback: 'still-photo',
-      reason: 'Android native PP-OCR frame recognizer is not bundled yet.',
+      reason:
+        'Android native PP-OCR frame recognizer binding is not bundled yet.',
     });
   });
 
-  test('keeps iOS unavailable until the Apple Vision recognizer is bundled', () => {
+  test('treats iOS as out of scope for this Android repository', () => {
     expect(nativeFrameOcrRecognizerCapability('ios')).toMatchObject({
       available: false,
-      status: 'native-recognizer-missing',
+      status: 'ios-out-of-scope',
       platform: 'ios',
-      directFrameBuffer: true,
+      directFrameBuffer: false,
       fallback: 'still-photo',
-      reason: 'iOS Apple Vision frame recognizer is not bundled yet.',
+      reason:
+        'iOS native OCR is out of scope for this Android-focused repository. Use the dedicated Routelo for iOS repository.',
     });
   });
 
-  test('describes the Android and iOS recognizers when native bindings exist', () => {
-    expect(nativeFrameOcrRecognizerCapability('android', true)).toMatchObject({
+  test('describes the Android recognizer when native bindings exist', () => {
+    expect(
+      nativeFrameOcrRecognizerCapability('android', true, true),
+    ).toMatchObject({
       available: true,
       status: 'available',
       recognizerId: 'android-native-ppocr',
-      directFrameBuffer: true,
-    });
-    expect(nativeFrameOcrRecognizerCapability('ios', true)).toMatchObject({
-      available: true,
-      status: 'available',
-      recognizerId: 'ios-apple-vision',
       directFrameBuffer: true,
     });
   });
@@ -67,6 +79,6 @@ describe('native frame OCR recognizer contract', () => {
           recognizerId: 'android-native-ppocr',
         },
       }),
-    ).rejects.toThrow('Android native PP-OCR frame recognizer is not bundled');
+    ).rejects.toThrow('Android native PP-OCR frame OCR is disabled');
   });
 });
