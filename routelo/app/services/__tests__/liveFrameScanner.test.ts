@@ -122,4 +122,64 @@ describe('LiveOcrFrameScanner', () => {
     expect(second.decision).toBe('skipped-busy');
     expect(scanner.snapshot().telemetry.skippedByBackpressure).toBe(1);
   });
+
+  it('accepts native-recognized frame results without re-running image OCR', async () => {
+    const scanner = new LiveOcrFrameScanner({ minIntervalMs: 0 });
+    const scan = await scanner.acceptRecognizedNativeFrame(
+      result([
+        field('orderingVendorName', 'Native OCR Flower', 90),
+        field('deliveryAddress', 'Seoul Gangnam Test Road 1', 88),
+      ]),
+      {
+        source: 'native-frame',
+        width: 1280,
+        height: 720,
+        capturedAt: 3000,
+        timestamp: 123,
+        orientation: 'right',
+        pixelFormat: 'yuv-420-8-bit-video',
+        platform: 'android',
+        recognizerId: 'android-native-ppocr',
+      },
+    );
+
+    expect(scan.decision).toBe('accepted');
+    expect(scan.snapshot.telemetry).toMatchObject({
+      sampledFrames: 1,
+      ocrRuns: 1,
+      acceptedFrames: 1,
+      lastOcrMs: 100,
+    });
+    expect(scan.snapshot.aggregateResult?.rawText).toContain(
+      'Native OCR Flower',
+    );
+  });
+
+  it('rejects low-quality native-recognized frame results before accumulation', async () => {
+    const scanner = new LiveOcrFrameScanner({ minIntervalMs: 0 });
+    const lowQuality = result([field('orderingVendorName', 'Noise', 90)]);
+    lowQuality.quality = {
+      ...lowQuality.quality,
+      passed: false,
+      score: 40,
+      messages: ['Native OCR frame quality is too low.'],
+    };
+
+    const scan = await scanner.acceptRecognizedNativeFrame(lowQuality, {
+      source: 'native-frame',
+      width: 320,
+      height: 180,
+      capturedAt: 4000,
+      platform: 'ios',
+      recognizerId: 'apple-vision',
+    });
+
+    expect(scan.decision).toBe('rejected-quality');
+    expect(scan.snapshot.aggregateResult).toBeUndefined();
+    expect(scan.snapshot.telemetry).toMatchObject({
+      sampledFrames: 1,
+      rejectedByQuality: 1,
+      ocrRuns: 0,
+    });
+  });
 });
