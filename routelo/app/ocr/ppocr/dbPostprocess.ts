@@ -9,12 +9,14 @@ export type DbPostprocessOptions = {
 };
 
 type Component = {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
   pixels: number;
   score: number;
+  cornerPoints: PpOcrRegion['cornerPoints'];
+};
+
+type DetectorPoint = {
+  x: number;
+  y: number;
 };
 
 function verticalOverlap(left: PpOcrRegion, right: PpOcrRegion) {
@@ -90,6 +92,145 @@ function mergeTextRows(regions: PpOcrRegion[]): PpOcrRegion[] {
   return rows;
 }
 
+function boundingBoxForPoints(points: PpOcrRegion['cornerPoints']) {
+  const xs = points.map(({ x }) => x);
+  const ys = points.map(({ y }) => y);
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  const right = Math.max(...xs);
+  const bottom = Math.max(...ys);
+  return {
+    x: Math.floor(left),
+    y: Math.floor(top),
+    width: Math.max(1, Math.ceil(right - left)),
+    height: Math.max(1, Math.ceil(bottom - top)),
+  };
+}
+
+function sortBoxCorners(
+  points: PpOcrRegion['cornerPoints'],
+): PpOcrRegion['cornerPoints'] {
+  const center = points.reduce(
+    (acc, point) => ({ x: acc.x + point.x / 4, y: acc.y + point.y / 4 }),
+    { x: 0, y: 0 },
+  );
+  const sorted = [...points].sort(
+    (left, right) =>
+      Math.atan2(left.y - center.y, left.x - center.x) -
+      Math.atan2(right.y - center.y, right.x - center.x),
+  );
+  const startIndex = sorted.reduce((bestIndex, point, index) => {
+    const best = sorted[bestIndex];
+    return point.x + point.y < best.x + best.y ? index : bestIndex;
+  }, 0);
+  return [
+    sorted[startIndex],
+    sorted[(startIndex + 1) % 4],
+    sorted[(startIndex + 2) % 4],
+    sorted[(startIndex + 3) % 4],
+  ];
+}
+
+function buildOrientedComponent(
+  queue: Int32Array,
+  count: number,
+  probabilityMap: Float32Array,
+  mapWidth: number,
+  sourceWidth: number,
+  sourceHeight: number,
+  scaleX: number,
+  scaleY: number,
+  unclipRatio: number,
+): Component {
+  const points: DetectorPoint[] = [];
+  let score = 0;
+  let sumX = 0;
+  let sumY = 0;
+  let sumXX = 0;
+  let sumYY = 0;
+  let sumXY = 0;
+
+  for (let index = 0; index < count; index += 1) {
+    const current = queue[index];
+    const x = current % mapWidth;
+    const y = Math.floor(current / mapWidth);
+    points.push({ x, y });
+    score += probabilityMap[current];
+    sumX += x;
+    sumY += y;
+    sumXX += x * x;
+    sumYY += y * y;
+    sumXY += x * y;
+  }
+
+  const centerX = sumX / Math.max(1, count);
+  const centerY = sumY / Math.max(1, count);
+  const covarianceXX = sumXX / Math.max(1, count) - centerX * centerX;
+  const covarianceYY = sumYY / Math.max(1, count) - centerY * centerY;
+  const covarianceXY = sumXY / Math.max(1, count) - centerX * centerY;
+  const angle =
+    Math.abs(covarianceXY) < 1e-5 &&
+    Math.abs(covarianceXX - covarianceYY) < 1e-5
+      ? 0
+      : 0.5 * Math.atan2(2 * covarianceXY, covarianceXX - covarianceYY);
+  const axisX = Math.cos(angle);
+  const axisY = Math.sin(angle);
+  const normalX = -axisY;
+  const normalY = axisX;
+  let minAxis = Number.POSITIVE_INFINITY;
+  let maxAxis = Number.NEGATIVE_INFINITY;
+  let minNormal = Number.POSITIVE_INFINITY;
+  let maxNormal = Number.NEGATIVE_INFINITY;
+
+  points.forEach((point) => {
+    const dx = point.x - centerX;
+    const dy = point.y - centerY;
+    const axisProjection = dx * axisX + dy * axisY;
+    const normalProjection = dx * normalX + dy * normalY;
+    minAxis = Math.min(minAxis, axisProjection);
+    maxAxis = Math.max(maxAxis, axisProjection);
+    minNormal = Math.min(minNormal, normalProjection);
+    maxNormal = Math.max(maxNormal, normalProjection);
+  });
+
+  const axisPadding = Math.max(
+    1,
+    ((maxAxis - minAxis + 1) * (unclipRatio - 1)) / 2,
+  );
+  const normalPadding = Math.max(
+    1,
+    ((maxNormal - minNormal + 1) * (unclipRatio - 1)) / 2,
+  );
+  minAxis -= axisPadding;
+  maxAxis += axisPadding;
+  minNormal -= normalPadding;
+  maxNormal += normalPadding;
+
+  const toSourcePoint = (axisProjection: number, normalProjection: number) => {
+    const x =
+      (centerX + axisProjection * axisX + normalProjection * normalX) * scaleX;
+    const y =
+      (centerY + axisProjection * axisY + normalProjection * normalY) * scaleY;
+    return {
+      x: Math.max(0, Math.min(sourceWidth, x)),
+      y: Math.max(0, Math.min(sourceHeight, y)),
+    };
+  };
+
+  const cornerPoints = sortBoxCorners([
+    toSourcePoint(minAxis, minNormal),
+    toSourcePoint(maxAxis, minNormal),
+    toSourcePoint(maxAxis, maxNormal),
+    toSourcePoint(minAxis, maxNormal),
+  ]);
+
+  return {
+    pixels: count,
+    score: count ? score / count : 0,
+    cornerPoints,
+  };
+}
+
 const NEIGHBORS = [
   [-1, -1],
   [0, -1],
@@ -117,6 +258,8 @@ export function extractDbTextRegions(
   const visited = new Uint8Array(width * height);
   const queue = new Int32Array(width * height);
   const components: Component[] = [];
+  const scaleX = sourceWidth / width;
+  const scaleY = sourceHeight / height;
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -125,10 +268,6 @@ export function extractDbTextRegions(
 
       let head = 0;
       let tail = 0;
-      let minX = x;
-      let maxX = x;
-      let minY = y;
-      let maxY = y;
       let score = 0;
       queue[tail++] = start;
       visited[start] = 1;
@@ -138,10 +277,6 @@ export function extractDbTextRegions(
         const currentX = current % width;
         const currentY = Math.floor(current / width);
         score += probabilityMap[current];
-        minX = Math.min(minX, currentX);
-        maxX = Math.max(maxX, currentX);
-        minY = Math.min(minY, currentY);
-        maxY = Math.max(maxY, currentY);
 
         NEIGHBORS.forEach(([dx, dy]) => {
           const nextX = currentX + dx;
@@ -160,63 +295,41 @@ export function extractDbTextRegions(
       const pixels = tail;
       const averageScore = pixels ? score / pixels : 0;
       if (pixels >= minArea && averageScore >= boxThreshold) {
-        components.push({
-          minX,
-          minY,
-          maxX,
-          maxY,
-          pixels,
-          score: averageScore,
-        });
+        components.push(
+          buildOrientedComponent(
+            queue,
+            tail,
+            probabilityMap,
+            width,
+            sourceWidth,
+            sourceHeight,
+            scaleX,
+            scaleY,
+            unclipRatio,
+          ),
+        );
       }
     }
   }
 
-  const scaleX = sourceWidth / width;
-  const scaleY = sourceHeight / height;
-  return mergeTextRows(components
-    .map((component): PpOcrRegion => {
-      const rawWidth = component.maxX - component.minX + 1;
-      const rawHeight = component.maxY - component.minY + 1;
-      const expandX = (rawWidth * (unclipRatio - 1)) / 2;
-      const expandY = (rawHeight * (unclipRatio - 1)) / 2;
-      const left = Math.max(0, (component.minX - expandX) * scaleX);
-      const top = Math.max(0, (component.minY - expandY) * scaleY);
-      const right = Math.min(
-        sourceWidth,
-        (component.maxX + 1 + expandX) * scaleX,
-      );
-      const bottom = Math.min(
-        sourceHeight,
-        (component.maxY + 1 + expandY) * scaleY,
-      );
-      const boundingBox = {
-        x: Math.floor(left),
-        y: Math.floor(top),
-        width: Math.max(1, Math.ceil(right - left)),
-        height: Math.max(1, Math.ceil(bottom - top)),
-      };
-      return {
-        score: component.score,
-        boundingBox,
-        cornerPoints: [
-          { x: boundingBox.x, y: boundingBox.y },
-          { x: boundingBox.x + boundingBox.width, y: boundingBox.y },
-          {
-            x: boundingBox.x + boundingBox.width,
-            y: boundingBox.y + boundingBox.height,
-          },
-          { x: boundingBox.x, y: boundingBox.y + boundingBox.height },
-        ],
-      };
-    })
-    .filter(
-      ({ boundingBox }) =>
-        boundingBox.width >= 8 &&
-        boundingBox.height >= 6 &&
-        boundingBox.width * boundingBox.height <
-          sourceWidth * sourceHeight * 0.6,
-    ))
+  return mergeTextRows(
+    components
+      .map((component): PpOcrRegion => {
+        const boundingBox = boundingBoxForPoints(component.cornerPoints);
+        return {
+          score: component.score,
+          boundingBox,
+          cornerPoints: component.cornerPoints,
+        };
+      })
+      .filter(
+        ({ boundingBox }) =>
+          boundingBox.width >= 8 &&
+          boundingBox.height >= 6 &&
+          boundingBox.width * boundingBox.height <
+            sourceWidth * sourceHeight * 0.6,
+      ),
+  )
     .sort(
       (left, right) =>
         left.boundingBox.y - right.boundingBox.y ||
