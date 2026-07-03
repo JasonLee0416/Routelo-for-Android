@@ -21,6 +21,7 @@ import {
 import {
   androidNativePpocrFrameRecognizerStatusLabel,
   inspectAndroidNativePpocrFrameRecognizer,
+  loadAndroidNativePpocrFrameRecognizerBinding,
 } from './androidNativePpocrFrameRecognizer';
 
 declare const require: (moduleName: string) => unknown;
@@ -149,7 +150,13 @@ function VisionCameraPreviewProbeNative({
   const frameStreamReady = Boolean(
     frameStreamEnabled && useFrameOutput && scheduleOnRN,
   );
-  const androidNativeOcrState = inspectAndroidNativePpocrFrameRecognizer();
+  const androidNativeOcrBinding = useMemo(
+    loadAndroidNativePpocrFrameRecognizerBinding,
+    [],
+  );
+  const androidNativeOcrState = inspectAndroidNativePpocrFrameRecognizer({
+    binding: androidNativeOcrBinding,
+  });
 
   const recordFrame = useCallback((metadata: VisionCameraFrameMetadata) => {
     setFrameTelemetry((current) =>

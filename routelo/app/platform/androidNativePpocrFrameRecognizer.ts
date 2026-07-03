@@ -1,5 +1,6 @@
 import type { OcrPipelineResult } from '../models';
 import type { LiveOcrNativeFrameMetadata } from '../services/liveFrameScanner';
+import { NativeModules, Platform } from 'react-native';
 
 export const ANDROID_NATIVE_PPOCR_FRAME_RECOGNIZER_ENV =
   'EXPO_PUBLIC_ROUTELO_ENABLE_ANDROID_NATIVE_PPOCR_FRAME_OCR';
@@ -13,9 +14,25 @@ export type AndroidNativePpocrFrameRecognizeInput = {
 };
 
 export type AndroidNativePpocrFrameRecognizerBinding = {
+  frameBufferRecognitionReady?: boolean;
+  implementationStage?: string;
   recognizeFrame: (
     input: AndroidNativePpocrFrameRecognizeInput,
   ) => OcrPipelineResult | Promise<OcrPipelineResult>;
+};
+
+type AndroidNativePpocrFrameRecognizerModule = {
+  getStatus?: () => Promise<{
+    bundled?: boolean;
+    frameBufferRecognitionReady?: boolean;
+    implementationStage?: string;
+    reason?: string;
+  }>;
+  recognizeFrameMetadata?: (
+    metadata: AndroidNativePpocrFrameRecognizeInput['metadata'],
+  ) => Promise<OcrPipelineResult>;
+  frameBufferRecognitionReady?: boolean;
+  implementationStage?: string;
 };
 
 export type AndroidNativePpocrFrameRecognizerState = {
@@ -39,6 +56,8 @@ export function inspectAndroidNativePpocrFrameRecognizer(
 ): AndroidNativePpocrFrameRecognizerState {
   const enabled = options.enabled ?? androidNativePpocrFrameRecognizerEnabled();
   const bundled = Boolean(options.binding);
+  const frameBufferRecognitionReady =
+    options.binding?.frameBufferRecognitionReady ?? bundled;
 
   if (!enabled) {
     return {
@@ -60,6 +79,16 @@ export function inspectAndroidNativePpocrFrameRecognizer(
     };
   }
 
+  if (!frameBufferRecognitionReady) {
+    return {
+      enabled: true,
+      bundled: true,
+      ready: false,
+      reason:
+        'Android native PP-OCR binding is bundled, but direct VisionCamera frame-buffer recognition is not implemented yet.',
+    };
+  }
+
   return {
     enabled: true,
     bundled: true,
@@ -78,7 +107,41 @@ export function androidNativePpocrFrameRecognizerStatusLabel(
     return 'disabled';
   }
 
-  return state.bundled ? 'initializing' : 'binding missing';
+  return state.bundled ? 'bundled / not ready' : 'binding missing';
+}
+
+export function loadAndroidNativePpocrFrameRecognizerBinding(
+  options: {
+    platform?: typeof Platform.OS;
+    nativeModules?: typeof NativeModules;
+  } = {},
+): AndroidNativePpocrFrameRecognizerBinding | null {
+  const platform = options.platform ?? Platform.OS;
+  const nativeModules = options.nativeModules ?? NativeModules;
+
+  if (platform !== 'android') {
+    return null;
+  }
+
+  const nativeModule = nativeModules
+    .RouteloAndroidPpocrFrameRecognizer as
+    | AndroidNativePpocrFrameRecognizerModule
+    | undefined;
+
+  if (!nativeModule?.recognizeFrameMetadata) {
+    return null;
+  }
+
+  return {
+    frameBufferRecognitionReady:
+      nativeModule.frameBufferRecognitionReady ?? false,
+    implementationStage: nativeModule.implementationStage,
+    recognizeFrame(input) {
+      return nativeModule.recognizeFrameMetadata?.(input.metadata) as Promise<
+        OcrPipelineResult
+      >;
+    },
+  };
 }
 
 export function createAndroidNativePpocrFrameRecognizer(

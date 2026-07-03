@@ -90,8 +90,15 @@ VisionCamera integration status:
 - `nativeFrameOcrRecognizer` defines the fail-closed platform contract for the
   upcoming Android native PP-OCR recognizer. iOS is explicitly out of scope for
   this repository, and CLOVA remains a later user-consented cloud fallback.
-- The app still reports live frame OCR as unavailable until the Android native
-  PP-OCR recognizer binding is bundled.
+- The Android PP-OCR recognizer now has a prebuild-safe native module scaffold
+  (`RouteloAndroidPpocrFrameRecognizer`) injected by
+  `plugins/withAndroidPpocrFrameRecognizer.js`. This proves the APK can bundle
+  an Android native OCR entrypoint without editing generated Android files
+  directly.
+- The scaffold intentionally reports `frameBufferRecognitionReady=false` and
+  rejects recognition calls until PP-OCR can consume VisionCamera frame buffers
+  directly. This prevents fake or placeholder OCR data from entering the
+  scanner.
 - `ImagePicker` still-photo OCR remains the safe fallback.
 
 Minimum live-scan checklist:
