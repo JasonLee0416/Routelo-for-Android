@@ -61,6 +61,18 @@ import {
   OcrRecognizerUnavailableError,
   runReceiptOcr,
 } from './services/ocr';
+import {
+  createInitialLiveOcrSession,
+  liveOcrChecklistItems,
+  liveOcrIncompleteMessage,
+  liveOcrReviewQuery,
+  liveOcrScannerStepLabel,
+  LiveOcrScanStage,
+  summarizeLiveOcrSession,
+  liveOcrStageTitle,
+  mergeOcrResult,
+  updateLiveOcrSession,
+} from './services/liveOcr';
 
 type TabKey =
   | 'home'
@@ -1959,7 +1971,7 @@ function DeliveryDetailSheet({
   );
 }
 
-type ScanStage = 'capture' | 'quality' | 'processing' | 'review';
+type ScanStage = LiveOcrScanStage;
 
 const OCR_FIELD_ICONS: Record<OcrFieldKey, keyof typeof Ionicons.glyphMap> = {
   orderingVendorName: 'storefront-outline',
@@ -2024,6 +2036,61 @@ function QualityMeter({
   );
 }
 
+function LiveScanChecklist({
+  session,
+}: {
+  session: ReturnType<typeof createInitialLiveOcrSession>;
+}) {
+  const { C, styles } = useTheme();
+  const summary = summarizeLiveOcrSession(session);
+  const checklist = liveOcrChecklistItems(session);
+  return (
+    <View style={styles.liveChecklist}>
+      <View style={styles.liveChecklistHeader}>
+        <Text style={styles.liveChecklistTitle}>필수 인식 항목</Text>
+        <Text style={styles.liveChecklistMeta}>{summary.lockedCount}/{summary.totalCount}</Text>
+      </View>
+      {checklist.map((field) => {
+        return (
+          <View
+            key={field.id}
+            style={[
+              styles.liveChecklistItem,
+              field.locked ? styles.liveChecklistItemLocked : undefined,
+              field.candidate ? styles.liveChecklistItemCandidate : undefined,
+            ]}
+          >
+            <View
+              style={[
+                styles.liveChecklistIcon,
+                {
+                  backgroundColor: field.locked
+                    ? C.successBg
+                    : field.candidate
+                      ? C.warningBg
+                      : C.surfaceAlt,
+                },
+              ]}
+            >
+              <Ionicons
+                name={field.locked ? 'checkmark-circle' : 'close-circle-outline'}
+                size={19}
+                color={field.locked ? C.success : field.candidate ? C.warning : C.textMuted}
+              />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.liveChecklistLabel}>{field.label}</Text>
+              <Text style={styles.liveChecklistValue} numberOfLines={1}>
+                {field.detail}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function OcrScannerModal({
   visible,
   settings,
@@ -2040,16 +2107,21 @@ function OcrScannerModal({
   const [imageUri, setImageUri] = useState<string>();
   const [assetInfo, setAssetInfo] = useState<{ width?: number; height?: number; fileSize?: number }>({});
   const [result, setResult] = useState<OcrPipelineResult>();
+  const [aggregateResult, setAggregateResult] = useState<OcrPipelineResult>();
   const [fields, setFields] = useState<OcrFieldResult[]>([]);
   const [vendorCheck, setVendorCheck] = useState<VendorVerification>();
+  const [liveSession, setLiveSession] = useState(createInitialLiveOcrSession);
+  const liveSummary = summarizeLiveOcrSession(liveSession);
 
   const reset = () => {
     setStage('capture');
     setImageUri(undefined);
     setAssetInfo({});
     setResult(undefined);
+    setAggregateResult(undefined);
     setFields([]);
     setVendorCheck(undefined);
+    setLiveSession(createInitialLiveOcrSession());
   };
 
   useEffect(() => {
@@ -2093,6 +2165,19 @@ function OcrScannerModal({
     setStage('quality');
   };
 
+  const verifyForReview = (reviewFields: OcrFieldResult[]) => {
+    const { vendorName, vendorPhone } = liveOcrReviewQuery(reviewFields);
+    setVendorCheck(undefined);
+    if (!vendorName) return;
+    verifyVendor(vendorDirectoryFor(settings), vendorName, {
+      ocrPhone: vendorPhone,
+    })
+      .then((verification) =>
+        verification.status === 'skipped' ? undefined : setVendorCheck(verification),
+      )
+      .catch(() => undefined);
+  };
+
   const analyze = async () => {
     if (result && !result.quality.passed) {
       Alert.alert('재촬영 권장', result.quality.messages[0] || '촬영 품질을 확인해주세요.');
@@ -2102,27 +2187,26 @@ function OcrScannerModal({
     setVendorCheck(undefined);
     try {
       const next = await runReceiptOcr({ ...assetInfo, uri: imageUri });
-      setResult(next);
-      setFields(next.fields);
-      setStage('review');
-      // 발주처 온라인 교차검증(옵트인). 업체명만 안전 검증해 provenance로 부착, 자동 입력 없음.
-      const vendorName =
-        next.fields.find((f) => f.key === 'orderingVendorName')?.value || '';
-      const vendorTel =
-        next.fields.find((f) => f.key === 'orderingVendorTel')?.value || '';
-      if (vendorName) {
-        verifyVendor(vendorDirectoryFor(settings), vendorName, {
-          ocrPhone: vendorTel,
-        })
-          .then((verification) =>
-            verification.status === 'skipped' ? undefined : setVendorCheck(verification),
-          )
-          .catch(() => undefined);
+      const merged = mergeOcrResult(aggregateResult, next);
+      const nextSession = updateLiveOcrSession(liveSession, next);
+      setAggregateResult(merged);
+      setLiveSession(nextSession);
+      setResult(merged);
+      setFields(merged.fields);
+      if (nextSession.readyForReview) {
+        setStage('review');
+        verifyForReview(merged.fields);
+      } else {
+        setStage('capture');
+        Alert.alert(
+          '프레임 누적 완료',
+          liveOcrIncompleteMessage(nextSession),
+        );
       }
     } catch (error) {
-      setResult(undefined);
-      setFields([]);
-      setStage('quality');
+      setResult(aggregateResult);
+      setFields(aggregateResult?.fields ?? []);
+      setStage('capture');
       Alert.alert(
         'OCR 인식 준비 중',
         error instanceof OcrRecognizerUnavailableError || error instanceof OcrNoTextDetectedError
@@ -2210,18 +2294,12 @@ function OcrScannerModal({
           <View style={styles.scannerHeaderCopy}>
             <Text style={styles.scannerEyebrow}>SMART DOCUMENT OCR</Text>
             <Text style={styles.scannerTitle}>
-              {stage === 'capture'
-                ? '인수증 스캔'
-                : stage === 'quality'
-                  ? '촬영 품질 검사'
-                  : stage === 'processing'
-                    ? '문서 분석 중'
-                    : '추출 결과 확인'}
+              {liveOcrStageTitle(stage)}
             </Text>
           </View>
           <View style={styles.scannerStep}>
             <Text style={styles.scannerStepText}>
-              {stage === 'capture' ? '1/4' : stage === 'quality' ? '2/4' : stage === 'processing' ? '3/4' : '4/4'}
+              {liveOcrScannerStepLabel(stage, liveSession)}
             </Text>
           </View>
         </View>
@@ -2235,16 +2313,19 @@ function OcrScannerModal({
               <View style={[styles.captureCorner, styles.captureCornerBottomRight]} />
               <View style={styles.documentPreview}>
                 <Ionicons name="document-text-outline" size={55} color="#89A7E8" />
-                <Text style={styles.documentPreviewTitle}>인수증 전체를 프레임에 맞춰주세요</Text>
+                <Text style={styles.documentPreviewTitle}>3개 필드를 찾을 때까지 스캔합니다</Text>
                 <Text style={styles.documentPreviewCaption}>
-                  흔들림·밝기·기울기·문서 잘림을 촬영 직후 자동 검사합니다.
+                  상호명, 주소, 전화번호가 모두 O로 고정되면 검토 화면으로 이동합니다.
                 </Text>
               </View>
               <View style={styles.autoCaptureBadge}>
                 <View style={styles.autoCaptureDot} />
-                <Text style={styles.autoCaptureText}>자동 촬영 조건 확인 중</Text>
+                <Text style={styles.autoCaptureText}>
+                  {liveSummary.frameSummary}
+                </Text>
               </View>
             </View>
+            <LiveScanChecklist session={liveSession} />
             <View style={styles.captureTips}>
               <View style={styles.captureTip}>
                 <Ionicons name="sunny-outline" size={20} color={C.primary} />
@@ -2261,11 +2342,13 @@ function OcrScannerModal({
             </View>
             <Pressable style={styles.scanPrimaryButton} onPress={() => selectImage(true)}>
               <Ionicons name="camera" size={21} color="#FFFFFF" />
-              <Text style={styles.scanPrimaryButtonText}>카메라로 촬영</Text>
+              <Text style={styles.scanPrimaryButtonText}>
+                {liveSummary.primaryCaptureLabel}
+              </Text>
             </Pressable>
             <Pressable style={styles.scanSecondaryButton} onPress={() => selectImage(false)}>
               <Ionicons name="images-outline" size={20} color={C.primary} />
-              <Text style={styles.scanSecondaryButtonText}>갤러리에서 선택</Text>
+              <Text style={styles.scanSecondaryButtonText}>갤러리 프레임 추가</Text>
             </Pressable>
           </ScrollView>
         )}
@@ -2291,7 +2374,7 @@ function OcrScannerModal({
             </View>
             <View style={styles.qualityCard}>
               <View style={styles.qualityCardHeader}>
-                <Text style={styles.qualityCardTitle}>촬영 품질 분석</Text>
+                <Text style={styles.qualityCardTitle}>프레임 품질 분석</Text>
                 <View style={[styles.badge, quality.passed ? styles.successBadge : styles.waitBadge]}>
                   <Text style={[styles.badgeText, { color: quality.passed ? C.success : C.warning }]}>
                     {quality.passed ? 'OCR 진행 가능' : '재촬영 권장'}
@@ -2313,15 +2396,15 @@ function OcrScannerModal({
             <View style={styles.variantInfo}>
               <Ionicons name="layers-outline" size={20} color={C.primary} />
               <Text style={styles.variantInfoText}>
-                원본·밝기·대비·기울기·임계값·샤프닝 6개 버전을 비교합니다.
+                품질이 통과한 프레임만 OCR에 넣고, 필드별 후보를 누적합니다.
               </Text>
             </View>
             <View style={styles.scanActionRow}>
               <Pressable style={styles.scanSecondaryFlex} onPress={reset}>
-                <Text style={styles.scanSecondaryButtonText}>다시 촬영</Text>
+                <Text style={styles.scanSecondaryButtonText}>스캔 초기화</Text>
               </Pressable>
               <Pressable style={styles.scanPrimaryFlex} onPress={analyze}>
-                <Text style={styles.scanPrimaryButtonText}>OCR 분석 시작</Text>
+                <Text style={styles.scanPrimaryButtonText}>이 프레임 누적</Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </Pressable>
             </View>
@@ -2335,9 +2418,9 @@ function OcrScannerModal({
             </View>
             <Text style={styles.processingTitle}>인수증을 정밀 분석하고 있습니다</Text>
             <Text style={styles.processingCaption}>
-              문서 보정, 6개 이미지 비교, 한국어 OCR, 필드 후보 검증을 수행합니다.
+              프레임 OCR은 온디바이스로만 수행하고, 온라인 검증은 리뷰 진입 후 한 번만 실행합니다.
             </Text>
-            {['문서 영역 및 원근 보정', '1차 모바일 OCR', '시간·주소·연락처 후보 분석', '필드별 신뢰도 계산'].map(
+            {['프레임 품질 gate', '로컬 PP-OCR 실행', '상호명·주소·전화번호 후보 누적', '3개 필드 lock 판정'].map(
               (item, index) => (
                 <View key={item} style={styles.processingStep}>
                   <View style={[styles.processingStepIcon, index < 2 && styles.processingStepIconActive]}>
@@ -2369,10 +2452,11 @@ function OcrScannerModal({
                       : '명시적 테스트 샘플'}
                   </Text>
                   <Text style={styles.ocrSummaryMetaText}>
-                    {result.variantsCompared}개 전처리 비교 · {result.processingMs}ms
+                    {liveSession.acceptedFrameCount}개 프레임 누적 · {result.processingMs}ms
                   </Text>
                 </View>
               </View>
+              <LiveScanChecklist session={liveSession} />
               <View style={styles.reviewGuide}>
                 <Ionicons name="information-circle-outline" size={19} color={C.primary} />
                 <Text style={styles.reviewGuideText}>
@@ -2431,7 +2515,9 @@ function OcrScannerModal({
                       ))}
                     </View>
                   )}
-                  {field.key === 'orderingVendorName' && vendorCheck && (
+                  {(field.key === 'orderingVendorName' ||
+                    (!valueOf('orderingVendorName') && field.key === 'venueName')) &&
+                    vendorCheck && (
                     <View style={styles.vendorCheckRow}>
                       <Ionicons
                         name={
@@ -3386,6 +3472,57 @@ const makeStyles = (C: Palette) =>
   },
   autoCaptureDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.success },
   autoCaptureText: { color: C.textMuted, fontSize: 9, fontWeight: '700' },
+  liveChecklist: {
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.outline,
+    padding: 14,
+    marginTop: 12,
+    gap: 9,
+  },
+  liveChecklistHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  liveChecklistTitle: { color: C.text, fontSize: 14, fontWeight: '900' },
+  liveChecklistMeta: { color: C.primary, fontSize: 12, fontWeight: '900' },
+  liveChecklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: C.background,
+    borderWidth: 1,
+    borderColor: C.outline,
+    paddingHorizontal: 12,
+  },
+  liveChecklistItemCandidate: {
+    borderColor: C.warning,
+    backgroundColor: C.warningBg,
+  },
+  liveChecklistItemLocked: {
+    borderColor: C.success,
+    backgroundColor: C.successBg,
+    transform: [{ scale: 1.01 }],
+  },
+  liveChecklistIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveChecklistLabel: { color: C.text, fontSize: 12, fontWeight: '900' },
+  liveChecklistValue: {
+    color: C.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 3,
+  },
   captureTips: { flexDirection: 'row', gap: 8, marginTop: 12 },
   captureTip: {
     flex: 1,
