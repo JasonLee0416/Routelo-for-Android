@@ -66,7 +66,9 @@ the adapter exists.
 Current implementation direction: use VisionCamera as the first native frame
 source candidate. See
 `docs/decisions/2026-07-03-live-ocr-frame-source-visioncamera.md` for the
-decision record and revisit triggers.
+frame-source decision record and
+`docs/decisions/2026-07-04-native-frame-ocr-recognizers.md` for the native
+recognizer decision.
 
 VisionCamera integration status:
 
@@ -82,8 +84,15 @@ VisionCamera integration status:
   The current stream records frame metadata and dropped-frame telemetry only.
   It intentionally does not convert native buffers into OCR assets, so the app
   cannot invent receipt data from a frame that has not been decoded.
-- The app still reports live frame OCR as unavailable until preview frame
-  streaming is wired into `LiveOcrFrameScanner`.
+- `LiveOcrFrameScanner.acceptRecognizedNativeFrame()` can now ingest OCR results
+  that were produced directly from Android/iOS native frame buffers. This keeps
+  the accumulation, quality gate, backpressure, and no-auto-save behavior shared
+  with the still-photo OCR path.
+- `nativeFrameOcrRecognizer` defines the fail-closed platform contract for the
+  upcoming recognizers: Android native PP-OCR first, iOS Apple Vision first, and
+  CLOVA only as a user-consented cloud fallback.
+- The app still reports live frame OCR as unavailable until the Android/iOS
+  native recognizer bindings are bundled.
 - `ImagePicker` still-photo OCR remains the safe fallback.
 
 Minimum live-scan checklist:

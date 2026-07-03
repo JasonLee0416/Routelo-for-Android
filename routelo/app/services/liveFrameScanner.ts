@@ -15,6 +15,18 @@ export type LiveOcrFrameAsset = {
   capturedAt?: number;
 };
 
+export type LiveOcrNativeFrameMetadata = {
+  source: 'native-frame';
+  width: number;
+  height: number;
+  capturedAt: number;
+  timestamp?: number;
+  orientation?: string;
+  pixelFormat?: string;
+  platform?: 'android' | 'ios';
+  recognizerId?: string;
+};
+
 export type LiveOcrFrameDecision =
   | 'accepted'
   | 'ready'
@@ -104,6 +116,65 @@ export class LiveOcrFrameScanner {
     this.lastSampledAt = undefined;
   }
 
+  private withinSamplingInterval(
+    now: number,
+    minIntervalMs: number,
+  ): boolean {
+    return (
+      this.lastSampledAt !== undefined &&
+      now - this.lastSampledAt < minIntervalMs
+    );
+  }
+
+  private acceptOcrResult(
+    result: OcrPipelineResult,
+  ): LiveOcrFrameScanResult {
+    const previousLocked = countLocked(this.session);
+    this.aggregateResult = mergeOcrResult(this.aggregateResult, result);
+    this.session = updateLiveOcrSession(this.session, result);
+    const nextLocked = countLocked(this.session);
+    this.telemetry.promotedFields += Math.max(0, nextLocked - previousLocked);
+    this.telemetry.acceptedFrames += this.session.lastFrameAccepted ? 1 : 0;
+
+    return {
+      decision: this.session.readyForReview ? 'ready' : 'accepted',
+      snapshot: this.snapshot(),
+      result: this.aggregateResult,
+    };
+  }
+
+  async acceptRecognizedNativeFrame(
+    result: OcrPipelineResult,
+    frame: LiveOcrNativeFrameMetadata,
+    options: LiveOcrFrameScannerOptions = {},
+  ): Promise<LiveOcrFrameScanResult> {
+    const mergedOptions = { ...this.defaults, ...options };
+    const now = mergedOptions.now?.() ?? frame.capturedAt;
+    const minIntervalMs = mergedOptions.minIntervalMs ?? 500;
+
+    if (this.withinSamplingInterval(now, minIntervalMs)) {
+      this.telemetry.skippedByInterval += 1;
+      return { decision: 'skipped-interval', snapshot: this.snapshot() };
+    }
+
+    if (this.inFlight) {
+      this.telemetry.skippedByBackpressure += 1;
+      return { decision: 'skipped-busy', snapshot: this.snapshot() };
+    }
+
+    this.lastSampledAt = now;
+    this.telemetry.sampledFrames += 1;
+    this.lastQuality = result.quality;
+    if ((mergedOptions.requireQualityPass ?? true) && !result.quality.passed) {
+      this.telemetry.rejectedByQuality += 1;
+      return { decision: 'rejected-quality', snapshot: this.snapshot() };
+    }
+
+    this.telemetry.ocrRuns += 1;
+    this.telemetry.lastOcrMs = Math.max(0, result.processingMs);
+    return this.acceptOcrResult(result);
+  }
+
   async acceptFrame(
     frame: LiveOcrFrameAsset,
     options: LiveOcrFrameScannerOptions = {},
@@ -112,10 +183,7 @@ export class LiveOcrFrameScanner {
     const now = mergedOptions.now?.() ?? Date.now();
     const minIntervalMs = mergedOptions.minIntervalMs ?? 500;
 
-    if (
-      this.lastSampledAt !== undefined &&
-      now - this.lastSampledAt < minIntervalMs
-    ) {
+    if (this.withinSamplingInterval(now, minIntervalMs)) {
       this.telemetry.skippedByInterval += 1;
       return { decision: 'skipped-interval', snapshot: this.snapshot() };
     }
@@ -145,18 +213,7 @@ export class LiveOcrFrameScanner {
         (mergedOptions.now?.() ?? Date.now()) - startedAt,
       );
 
-      const previousLocked = countLocked(this.session);
-      this.aggregateResult = mergeOcrResult(this.aggregateResult, result);
-      this.session = updateLiveOcrSession(this.session, result);
-      const nextLocked = countLocked(this.session);
-      this.telemetry.promotedFields += Math.max(0, nextLocked - previousLocked);
-      this.telemetry.acceptedFrames += this.session.lastFrameAccepted ? 1 : 0;
-
-      return {
-        decision: this.session.readyForReview ? 'ready' : 'accepted',
-        snapshot: this.snapshot(),
-        result: this.aggregateResult,
-      };
+      return this.acceptOcrResult(result);
     } catch (error) {
       const normalized =
         error instanceof Error ? error : new Error('Live OCR frame failed.');
