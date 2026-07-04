@@ -1,0 +1,14 @@
+diff --git a/node_modules/react-native-vision-camera-worklets/android/fix-prefab.gradle b/node_modules/react-native-vision-camera-worklets/android/fix-prefab.gradle
+index d6c010e..ac661a3 100644
+--- a/node_modules/react-native-vision-camera-worklets/android/fix-prefab.gradle
++++ b/node_modules/react-native-vision-camera-worklets/android/fix-prefab.gradle
+@@ -13,6 +13,9 @@ tasks.configureEach { task ->
+ }
+ 
+ afterEvaluate {
++  def shouldTouchPrefabConfig = (rootProject.findProperty("VisionCameraWorklets_touchPrefabConfig") ?: "false").toBoolean()
++  if (!shouldTouchPrefabConfig) return
++
+   def abis = reactNativeArchitectures()
+   rootProject.allprojects.each { proj ->
+     if (proj === rootProject) return
