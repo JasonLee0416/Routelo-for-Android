@@ -50,6 +50,24 @@ describe('PP-OCR shared core', () => {
     expect(/^[가-힣]+$/.test(decoded.text)).toBe(true);
   });
 
+  it('composes full LVT clusters and preserves mixed Latin (받TEL)', () => {
+    // 종성(jongseong, U+11xx 블록)이 포함된 완전한 LVT 음절 합성 + 라틴 통과 검증.
+    // 사전: [ᄇ, ᅡ, ᆮ, T, E, L] → '받' + 'TEL'.
+    const dictionary = ['ᄇ', 'ᅡ', 'ᆮ', 'T', 'E', 'L']; // ᄇ ᅡ ᆮ 받침
+    const classes = dictionary.length + 1;
+    const order = [1, 2, 3, 4, 5, 6];
+    const logits = new Float32Array(order.length * classes);
+    order.forEach((cls, step) => {
+      logits[step * classes + cls] = 10;
+    });
+
+    const decoded = decodeCtc(logits, order.length, classes, dictionary);
+    expect(decoded.text).toBe('받TEL'); // 받: U+BC1B (완성형 LVT)
+    expect(decoded.text).toHaveLength(4);
+    expect(decoded.text.includes('받')).toBe(true); // 라벨 includes 매칭 복구
+    expect(/[가-힣]/.test(decoded.text)).toBe(true);
+  });
+
   it('passes through softmax-probability inputs as the max probability', () => {
     // 이미 확률 분포(합=1)인 출력: 스텝별 최대 확률을 그대로 신뢰도로 사용.
     const probs = new Float32Array([0.05, 0.9, 0.05, 0.05, 0.05, 0.9]);
