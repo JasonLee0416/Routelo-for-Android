@@ -64,8 +64,11 @@ export function decodeCtc(
     previous = index;
   }
 
+  // PP-OCRv5 한국어 사전은 조합형 자모(U+1100 블록)라 스텝 출력이 분해형 자모다.
+  // NFC로 완성형 음절(U+AC00 블록)로 합쳐야 이후 `가-힣` 정규식/`includes` 라벨
+  // 매칭이 성립한다. 정규화 없이는 모델이 정확히 읽어도 한글 필드 추출이 전면 실패한다.
   return {
-    text: characters.join('').trim(),
+    text: characters.join('').normalize('NFC').trim(),
     confidence: confidenceCount ? confidenceSum / confidenceCount : 0,
   };
 }
