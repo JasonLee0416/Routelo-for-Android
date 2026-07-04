@@ -9,6 +9,7 @@ import { Image } from 'react-native';
 
 import type { PpOcrRegion } from './types';
 import type { PpOcrOrientation } from './orientation';
+import { stripWidthForQuad, warpQuadToStrip, type WarpPoint } from './warp';
 
 export type DecodedJpeg = {
   width: number;
@@ -82,38 +83,22 @@ export async function prepareRecognitionCrop(
   targetWidth = 320,
 ): Promise<DecodedJpeg> {
   const box = region.boundingBox;
+  const originX = Math.max(0, Math.floor(box.x));
+  const originY = Math.max(0, Math.floor(box.y));
   const cropWidth = Math.max(1, Math.round(box.width));
   const cropHeight = Math.max(1, Math.round(box.height));
-  const scaledWidth = Math.max(
-    8,
-    Math.min(targetWidth, Math.round((cropWidth * targetHeight) / cropHeight)),
-  );
-  const topEdge = {
-    x: region.cornerPoints[1].x - region.cornerPoints[0].x,
-    y: region.cornerPoints[1].y - region.cornerPoints[0].y,
-  };
-  const skewDegrees = (Math.atan2(topEdge.y, topEdge.x) * 180) / Math.PI;
-  const deskewDegrees =
-    Number.isFinite(skewDegrees) &&
-    Math.abs(skewDegrees) >= 2 &&
-    Math.abs(skewDegrees) <= 25
-      ? -skewDegrees
-      : 0;
-  const actions: Action[] = [
-    {
-      crop: {
-        originX: Math.max(0, Math.round(box.x)),
-        originY: Math.max(0, Math.round(box.y)),
-        width: cropWidth,
-        height: cropHeight,
-      },
-    },
-  ];
-  if (deskewDegrees) {
-    actions.push({ rotate: deskewDegrees });
-  }
-  actions.push({ resize: { width: scaledWidth, height: targetHeight } });
-  return manipulateToJpeg(uri, actions);
+  // 방향성 사각형을 포함하는 축정렬 영역만 네이티브로 잘라 디코드(전체 디코드 비용 회피).
+  const cropped = await manipulateToJpeg(uri, [
+    { crop: { originX, originY, width: cropWidth, height: cropHeight } },
+  ]);
+  // 크롭 좌표계 기준의 사각형 꼭짓점(dbPostprocess가 TL, TR, BR, BL 순서로 제공).
+  const quad = region.cornerPoints.map((point) => ({
+    x: point.x - originX,
+    y: point.y - originY,
+  })) as [WarpPoint, WarpPoint, WarpPoint, WarpPoint];
+  const width = stripWidthForQuad(quad, targetHeight, targetWidth);
+  // 방향성 사각형을 원근보정해 인식기용 정규 수평 스트립으로 편다(축정렬 크롭 대비 왜곡 제거).
+  return warpQuadToStrip(cropped, quad, width, targetHeight);
 }
 
 export function detectorTensorData(image: DecodedJpeg): Float32Array {
