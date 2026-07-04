@@ -4,6 +4,7 @@ import {
   OcrFieldResult,
   OcrPipelineResult,
 } from '../models';
+import { fixConfusableDigits } from '../ocr/confusables';
 import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
 import { buildLayoutText } from '../ocr/layout';
 import { normalizeReceipt } from '../ocr/normalize';
@@ -87,7 +88,7 @@ const VALID_PHONE =
   /^(?:01[016789]-\d{3,4}-\d{4}|02-\d{3,4}-\d{4}|0[3-6]\d-\d{3,4}-\d{4})$/;
 
 const normalizeTime = (value: string) => {
-  const compact = value.replace(/\s/g, '');
+  const compact = fixConfusableDigits(value.replace(/\s/g, ''));
   const colon = compact.match(/(\d{1,2}):(\d{2})/);
   if (colon) {
     const hour = Number(colon[1]);
@@ -221,7 +222,8 @@ function validatedPhoneCandidate(
   candidate: ReturnType<typeof findLabeledValue>,
 ) {
   if (!candidate) return undefined;
-  const value = allMatches(candidate.value, PHONE_PATTERN)
+  // 전화 문맥에서 O→0, I/l→1 등 혼동 문자를 숫자로 교정한 뒤 패턴 추출.
+  const value = allMatches(fixConfusableDigits(candidate.value), PHONE_PATTERN)
     .map(normalizePhone)
     .find((phone) => VALID_PHONE.test(phone));
   return value ? { ...candidate, value } : undefined;
@@ -240,7 +242,8 @@ function safeRecipientName(value: string) {
   return trimmed.replace(/\s*(실장|팀장|담당자)$/, ' $1');
 }
 
-function normalizeQuantity(value: string) {
+function normalizeQuantity(rawValue: string) {
+  const value = fixConfusableDigits(rawValue);
   const explicit = value.match(/수량\s*[|:]?\s*(\d{1,2})/);
   const count = explicit || value.match(/(\d{1,2})\s*개/);
   const quantity = count ? Number(count[1]) : NaN;
@@ -249,7 +252,8 @@ function normalizeQuantity(value: string) {
     : '';
 }
 
-function normalizeDate(text: string) {
+function normalizeDate(rawText: string) {
+  const text = fixConfusableDigits(rawText);
   const exact = text.match(/20\d{2}[.\-/]\d{1,2}[.\-/]\d{1,2}/)?.[0];
   if (!exact) return '';
   const [year, month, day] = exact.split(/[.\-/]/).map(Number);
@@ -264,7 +268,8 @@ function normalizeDate(text: string) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function normalizeReceiptDate(text: string) {
+function normalizeReceiptDate(rawText: string) {
+  const text = fixConfusableDigits(rawText);
   const korean = text.match(/(20\d{2})년\s*(\d{1,2})월\s*(\d{1,2})일/);
   if (korean) {
     const [year, month, day] = [
