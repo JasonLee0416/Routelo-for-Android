@@ -20,15 +20,23 @@ const line = (text: string, confidence: number): PpOcrLine => ({
 });
 
 describe('PP-OCR shared core', () => {
-  it('decodes CTC blanks and repeated characters', () => {
+  it('decodes CTC blanks and repeated characters with calibrated confidence', () => {
     const logits = new Float32Array([
       10, 0, 0, 0, 10, 0, 0, 10, 0, 10, 0, 0, 0, 0, 10,
     ]);
 
-    expect(decodeCtc(logits, 5, 3, ['가', '나'])).toEqual({
-      text: '가나',
-      confidence: 10,
-    });
+    const decoded = decodeCtc(logits, 5, 3, ['가', '나']);
+    expect(decoded.text).toBe('가나');
+    // 신뢰도는 raw 로짓 평균이 아니라 [0,1] softmax 최대확률로 보정된다.
+    expect(decoded.confidence).toBeCloseTo(1, 3);
+  });
+
+  it('passes through softmax-probability inputs as the max probability', () => {
+    // 이미 확률 분포(합=1)인 출력: 스텝별 최대 확률을 그대로 신뢰도로 사용.
+    const probs = new Float32Array([0.05, 0.9, 0.05, 0.05, 0.05, 0.9]);
+    const decoded = decodeCtc(probs, 2, 3, ['가', '나']);
+    expect(decoded.text).toBe('가나');
+    expect(decoded.confidence).toBeCloseTo(0.9, 5);
   });
 
   it('extracts and unclips connected detector regions', () => {
