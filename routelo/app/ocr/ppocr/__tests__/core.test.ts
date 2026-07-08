@@ -31,6 +31,43 @@ describe('PP-OCR shared core', () => {
     expect(decoded.confidence).toBeCloseTo(1, 3);
   });
 
+  it('composes conjoining Hangul jamo into precomposed syllables via NFC', () => {
+    // PP-OCRv5 한국어 사전은 조합형 자모. 사전이 [ᄇ, ᅡ, ᄐ, ᅳ] 순이라고 할 때
+    // '바트'를 스텝별로 방출하도록 로짓을 구성한다(각 스텝 argmax가 해당 자모).
+    const dictionary = ['ᄇ', 'ᅡ', 'ᄐ', 'ᅳ']; // ᄇ ᅡ ᄐ ᅳ
+    const classes = dictionary.length + 1; // +1 blank(index 0)
+    const steps = 4;
+    const logits = new Float32Array(steps * classes);
+    // 각 스텝에서 원하는 자모 클래스(dictionary index+1)에 큰 값.
+    [1, 2, 3, 4].forEach((cls, step) => {
+      logits[step * classes + cls] = 10;
+    });
+
+    const decoded = decodeCtc(logits, steps, classes, dictionary);
+    // 분해형 join이 아니라 완성형 음절로 합쳐져야 하고 `가-힣`에 매칭돼야 한다.
+    expect(decoded.text).toBe('바트');
+    expect(decoded.text).toHaveLength(2);
+    expect(/^[가-힣]+$/.test(decoded.text)).toBe(true);
+  });
+
+  it('composes full LVT clusters and preserves mixed Latin (받TEL)', () => {
+    // 종성(jongseong, U+11xx 블록)이 포함된 완전한 LVT 음절 합성 + 라틴 통과 검증.
+    // 사전: [ᄇ, ᅡ, ᆮ, T, E, L] → '받' + 'TEL'.
+    const dictionary = ['ᄇ', 'ᅡ', 'ᆮ', 'T', 'E', 'L']; // ᄇ ᅡ ᆮ 받침
+    const classes = dictionary.length + 1;
+    const order = [1, 2, 3, 4, 5, 6];
+    const logits = new Float32Array(order.length * classes);
+    order.forEach((cls, step) => {
+      logits[step * classes + cls] = 10;
+    });
+
+    const decoded = decodeCtc(logits, order.length, classes, dictionary);
+    expect(decoded.text).toBe('받TEL'); // 받: U+BC1B (완성형 LVT)
+    expect(decoded.text).toHaveLength(4);
+    expect(decoded.text.includes('받')).toBe(true); // 라벨 includes 매칭 복구
+    expect(/[가-힣]/.test(decoded.text)).toBe(true);
+  });
+
   it('passes through softmax-probability inputs as the max probability', () => {
     // 이미 확률 분포(합=1)인 출력: 스텝별 최대 확률을 그대로 신뢰도로 사용.
     const probs = new Float32Array([0.05, 0.9, 0.05, 0.05, 0.05, 0.9]);
