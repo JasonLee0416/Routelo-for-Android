@@ -12,6 +12,7 @@ import {
   recognizerTensorData,
 } from './image';
 import { PP_OCR_MODEL_VERSION } from './modelManifest';
+import { selectPpOcrPreprocessProfile } from './profile';
 import {
   chooseBestOrientationCandidate,
   isGoodOrientationCandidate,
@@ -102,70 +103,82 @@ export async function recognizeReceiptWithPpOcr(
   if (!imageUri.trim()) throw new Error('Receipt image URI is required.');
   const startedAt = Date.now();
   const { ort, detector, recognizer, dictionary } = await loadRuntime();
+  const profile = selectPpOcrPreprocessProfile();
 
   const runOrientationCandidate = async (
     orientation: PpOcrOrientation,
   ): Promise<PpOcrOrientationCandidate> => {
     const candidateStartedAt = Date.now();
     const variantUri = await prepareOrientationVariantUri(imageUri, orientation);
-    const detectorImage = await prepareDetectorImage(variantUri);
-  const detectorInput = new ort.Tensor(
-    'float32',
-    detectorTensorData(detectorImage),
-    [1, 3, detectorImage.height, detectorImage.width],
-  );
-  const detectorOutputMap = await detector.run({
-    [detector.inputNames[0]]: detectorInput,
-  });
-  const detectorOutput = detectorOutputMap[detector.outputNames[0]];
-  const detectorShape = tensorShape(detectorOutput);
-  const mapHeight = detectorShape.at(-2);
-  const mapWidth = detectorShape.at(-1);
-  if (!mapHeight || !mapWidth) {
-    throw new Error(`Unexpected PP-OCR detector output: ${detectorShape}.`);
-  }
-  const probabilities = detectorOutput.data as Float32Array;
-  const mapOffset = probabilities.length - mapHeight * mapWidth;
-  const regions = extractDbTextRegions(
-    probabilities.subarray(mapOffset),
-    mapWidth,
-    mapHeight,
-    detectorImage.sourceWidth,
-    detectorImage.sourceHeight,
-  );
-
-  const lines: PpOcrLine[] = [];
-  for (const region of regions) {
-      const crop = await prepareRecognitionCrop(variantUri, region);
-    const input = new ort.Tensor('float32', recognizerTensorData(crop), [
-      1,
-      3,
-      crop.height,
-      320,
-    ]);
-    const outputMap = await recognizer.run({
-      [recognizer.inputNames[0]]: input,
-    });
-    const output = outputMap[recognizer.outputNames[0]];
-    const shape = tensorShape(output);
-    const steps = shape.at(-2);
-    const classes = shape.at(-1);
-    if (!steps || !classes) continue;
-    const decoded = decodeCtc(
-      output.data as Float32Array,
-      steps,
-      classes,
-      dictionary,
+    const detectorImage = await prepareDetectorImage(
+      variantUri,
+      profile.detectorMaxSide,
     );
-    if (decoded.text && decoded.confidence >= 0.35) {
-      lines.push({
-        text: decoded.text,
-        confidence: decoded.confidence,
-        boundingBox: region.boundingBox,
-        cornerPoints: region.cornerPoints,
-      });
+    const detectorInput = new ort.Tensor(
+      'float32',
+      detectorTensorData(detectorImage, profile.tensor),
+      [1, 3, detectorImage.height, detectorImage.width],
+    );
+    const detectorOutputMap = await detector.run({
+      [detector.inputNames[0]]: detectorInput,
+    });
+    const detectorOutput = detectorOutputMap[detector.outputNames[0]];
+    const detectorShape = tensorShape(detectorOutput);
+    const mapHeight = detectorShape.at(-2);
+    const mapWidth = detectorShape.at(-1);
+    if (!mapHeight || !mapWidth) {
+      throw new Error(`Unexpected PP-OCR detector output: ${detectorShape}.`);
     }
-  }
+    const probabilities = detectorOutput.data as Float32Array;
+    const mapOffset = probabilities.length - mapHeight * mapWidth;
+    const regions = extractDbTextRegions(
+      probabilities.subarray(mapOffset),
+      mapWidth,
+      mapHeight,
+      detectorImage.sourceWidth,
+      detectorImage.sourceHeight,
+    );
+
+    const lines: PpOcrLine[] = [];
+    for (const region of regions) {
+      const crop = await prepareRecognitionCrop(
+        variantUri,
+        region,
+        profile.recognizerTargetHeight,
+        profile.recognizerTargetWidth,
+      );
+      const input = new ort.Tensor(
+        'float32',
+        recognizerTensorData(
+          crop,
+          profile.recognizerTargetWidth,
+          profile.tensor,
+        ),
+        [1, 3, crop.height, profile.recognizerTargetWidth],
+      );
+      const outputMap = await recognizer.run({
+        [recognizer.inputNames[0]]: input,
+      });
+      const output = outputMap[recognizer.outputNames[0]];
+      const shape = tensorShape(output);
+      const steps = shape.at(-2);
+      const classes = shape.at(-1);
+      if (!steps || !classes) continue;
+      const decoded = decodeCtc(
+        output.data as Float32Array,
+        steps,
+        classes,
+        dictionary,
+      );
+      if (decoded.text && decoded.confidence >= profile.minLineConfidence) {
+        lines.push({
+          text: decoded.text,
+          confidence: decoded.confidence,
+          boundingBox: region.boundingBox,
+          cornerPoints: region.cornerPoints,
+        });
+      }
+    }
 
     return {
       orientation,
@@ -193,5 +206,6 @@ export async function recognizeReceiptWithPpOcr(
     processingMs: Date.now() - startedAt,
     orientationDegrees: best.orientation,
     variantsCompared: candidates.length,
+    preprocessProfileId: profile.id,
   };
 }

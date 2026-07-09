@@ -10,6 +10,7 @@ import { Image } from 'react-native';
 import type { PpOcrRegion } from './types';
 import type { PpOcrOrientation } from './orientation';
 import { stripWidthForQuad, warpQuadToStrip, type WarpPoint } from './warp';
+import type { PpOcrTensorPreprocessOptions } from './profile';
 
 export type DecodedJpeg = {
   width: number;
@@ -20,6 +21,10 @@ export type DecodedJpeg = {
 export type DetectorImage = DecodedJpeg & {
   sourceWidth: number;
   sourceHeight: number;
+};
+
+const DEFAULT_TENSOR_PREPROCESS: PpOcrTensorPreprocessOptions = {
+  illuminationNormalization: false,
 };
 
 function imageSize(uri: string): Promise<{ width: number; height: number }> {
@@ -101,14 +106,57 @@ export async function prepareRecognitionCrop(
   return warpQuadToStrip(cropped, quad, width, targetHeight);
 }
 
-export function detectorTensorData(image: DecodedJpeg): Float32Array {
+function illuminationStats(image: DecodedJpeg) {
+  const pixels = image.width * image.height;
+  let sum = 0;
+  let sumSquares = 0;
+  for (let pixel = 0; pixel < pixels; pixel += 1) {
+    const rgba = pixel * 4;
+    const luminance =
+      (image.rgba[rgba] * 0.299 +
+        image.rgba[rgba + 1] * 0.587 +
+        image.rgba[rgba + 2] * 0.114) /
+      255;
+    sum += luminance;
+    sumSquares += luminance * luminance;
+  }
+  const mean = pixels ? sum / pixels : 0.5;
+  const variance = Math.max(0, pixels ? sumSquares / pixels - mean * mean : 0);
+  const std = Math.sqrt(variance);
+  return {
+    mean,
+    scale: Math.min(1.45, Math.max(1, 0.26 / Math.max(0.08, std))),
+  };
+}
+
+function normalizedChannel(
+  value: number,
+  stats: ReturnType<typeof illuminationStats> | undefined,
+) {
+  const normalized = value / 255;
+  if (!stats) return normalized;
+  return Math.max(
+    0,
+    Math.min(1, (normalized - stats.mean) * stats.scale + 0.55),
+  );
+}
+
+export function detectorTensorData(
+  image: DecodedJpeg,
+  options: PpOcrTensorPreprocessOptions = DEFAULT_TENSOR_PREPROCESS,
+): Float32Array {
+  const stats = options.illuminationNormalization
+    ? illuminationStats(image)
+    : undefined;
   const plane = image.width * image.height;
   const values = new Float32Array(plane * 3);
   for (let pixel = 0; pixel < plane; pixel += 1) {
     const rgba = pixel * 4;
-    values[pixel] = (image.rgba[rgba] / 255 - 0.485) / 0.229;
-    values[plane + pixel] = (image.rgba[rgba + 1] / 255 - 0.456) / 0.224;
-    values[plane * 2 + pixel] = (image.rgba[rgba + 2] / 255 - 0.406) / 0.225;
+    values[pixel] = (normalizedChannel(image.rgba[rgba], stats) - 0.485) / 0.229;
+    values[plane + pixel] =
+      (normalizedChannel(image.rgba[rgba + 1], stats) - 0.456) / 0.224;
+    values[plane * 2 + pixel] =
+      (normalizedChannel(image.rgba[rgba + 2], stats) - 0.406) / 0.225;
   }
   return values;
 }
@@ -116,7 +164,11 @@ export function detectorTensorData(image: DecodedJpeg): Float32Array {
 export function recognizerTensorData(
   image: DecodedJpeg,
   targetWidth = 320,
+  options: PpOcrTensorPreprocessOptions = DEFAULT_TENSOR_PREPROCESS,
 ): Float32Array {
+  const stats = options.illuminationNormalization
+    ? illuminationStats(image)
+    : undefined;
   const plane = targetWidth * image.height;
   const values = new Float32Array(plane * 3);
   values.fill(1);
@@ -124,9 +176,11 @@ export function recognizerTensorData(
     for (let x = 0; x < image.width; x += 1) {
       const source = (y * image.width + x) * 4;
       const target = y * targetWidth + x;
-      values[target] = image.rgba[source] / 127.5 - 1;
-      values[plane + target] = image.rgba[source + 1] / 127.5 - 1;
-      values[plane * 2 + target] = image.rgba[source + 2] / 127.5 - 1;
+      values[target] = normalizedChannel(image.rgba[source], stats) * 2 - 1;
+      values[plane + target] =
+        normalizedChannel(image.rgba[source + 1], stats) * 2 - 1;
+      values[plane * 2 + target] =
+        normalizedChannel(image.rgba[source + 2], stats) * 2 - 1;
     }
   }
   return values;
