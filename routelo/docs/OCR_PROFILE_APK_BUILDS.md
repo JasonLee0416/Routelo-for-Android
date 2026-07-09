@@ -18,15 +18,30 @@ silently reach normal test APKs.
 3. Set `ocr_profile`:
    - `stable-mobile` for regular APK checks.
    - `high-res-preprocess` for the guarded OCR experiment.
-4. Download the artifact:
-   - `routelo-debug-stable-mobile-<sha>`
-   - `routelo-debug-high-res-preprocess-<sha>`
+4. Set `apk_kind`:
+   - `standalone-release` for direct Galaxy/USB testing without Metro.
+   - `development-debug` only when you intentionally want Expo Dev Client + Metro.
+5. Download the artifact:
+   - `routelo-standalone-release-stable-mobile-<sha>`
+   - `routelo-standalone-release-high-res-preprocess-<sha>`
+   - or, for Metro/dev-client testing only:
+     `routelo-development-debug-<profile>-<sha>`
 
 The workflow bakes the selected profile into the bundle with:
 
 ```bash
 EXPO_PUBLIC_ROUTELO_OCR_PROFILE=<profile>
 ```
+
+The workflow also sets:
+
+```bash
+ROUTELO_APK_KIND=<standalone-release|development-debug>
+```
+
+If an installed APK opens the Expo Development Build launcher and asks for
+`npx expo start`, it is a `development-debug` APK, not a standalone test APK.
+Use `standalone-release` for normal device testing.
 
 ## Local build
 
@@ -36,7 +51,7 @@ From `routelo/`:
 $env:EXPO_PUBLIC_ROUTELO_OCR_PROFILE='high-res-preprocess'
 npx expo export --platform android --output-dir dist-android
 npx expo prebuild --platform android --clean --no-install
-./android/gradlew -p android :app:assembleDebug --no-daemon
+./android/gradlew -p android :app:assembleRelease --no-daemon
 ```
 
 For the default app path, omit the environment variable or set:
