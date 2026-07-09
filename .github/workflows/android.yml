@@ -7,6 +7,15 @@ on:
       - main
       - "codex/**"
   workflow_dispatch:
+    inputs:
+      ocr_profile:
+        description: "PP-OCR preprocessing profile to bake into the debug APK"
+        required: false
+        default: stable-mobile
+        type: choice
+        options:
+          - stable-mobile
+          - high-res-preprocess
 
 permissions:
   contents: read
@@ -19,6 +28,8 @@ jobs:
   debug-build:
     name: Expo prebuild and Android debug APK
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_ROUTELO_OCR_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.ocr_profile || 'stable-mobile' }}
     defaults:
       run:
         working-directory: routelo
@@ -49,6 +60,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Report OCR profile
+        run: echo "EXPO_PUBLIC_ROUTELO_OCR_PROFILE=$EXPO_PUBLIC_ROUTELO_OCR_PROFILE"
+
       - name: Verify shared PP-OCR models
         run: npm run verify:ocr-models
 
@@ -68,6 +82,6 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: routelo-debug-${{ github.sha }}
+          name: routelo-debug-${{ env.EXPO_PUBLIC_ROUTELO_OCR_PROFILE }}-${{ github.sha }}
           path: routelo/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
