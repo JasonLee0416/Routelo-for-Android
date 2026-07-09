@@ -29,4 +29,5 @@ export type PpOcrResult = {
   processingMs: number;
   orientationDegrees?: 0 | 90 | 180 | 270;
   variantsCompared?: number;
+  preprocessProfileId?: string;
 };
