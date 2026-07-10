@@ -15,6 +15,7 @@ const field = (
   key: OcrFieldKey,
   value: string,
   confidence: number,
+  overrides: Partial<OcrFieldResult> = {},
 ): OcrFieldResult => ({
   key,
   label: key,
@@ -24,6 +25,7 @@ const field = (
   sourceText: value,
   alternatives: [],
   status: confidence >= 85 ? 'confirmed' : 'review',
+  ...overrides,
 });
 
 const result = (fields: OcrFieldResult[]): OcrPipelineResult => ({
@@ -89,6 +91,23 @@ describe('live OCR session accumulator', () => {
 
     expect(session.fields.phone.status).toBe('missing');
     expect(session.readyForReview).toBe(false);
+  });
+
+  it('rejects warning candidates from live frame accumulation', () => {
+    const session = updateLiveOcrSession(
+      createInitialLiveOcrSession(),
+      result([
+        field('deliveryAddress', '받는분: 고인김기회 TEL', 99, {
+          status: 'warning',
+          validationErrors: ['Address candidate contains label evidence.'],
+        }),
+      ]),
+    );
+
+    expect(session.fields.address.status).toBe('missing');
+    expect(session.lastFrameAccepted).toBe(false);
+    expect(session.acceptedFrameCount).toBe(0);
+    expect(session.rejectedFrameCount).toBe(1);
   });
 
   it('does not let a later weaker different candidate overwrite a stronger candidate', () => {

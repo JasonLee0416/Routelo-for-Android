@@ -159,6 +159,7 @@ export function updateLiveOcrSession(
 
     const candidate = strongestCandidate(result.fields, definition.keys);
     if (!candidate || !candidate.value.trim()) continue;
+    if (!isReliableLiveCandidate(candidate)) continue;
     if (candidate.confidence < definition.threshold) continue;
     if (definition.validate && !definition.validate(candidate.value)) continue;
 
@@ -293,6 +294,10 @@ const strongestCandidate = (
     .filter((field) => keys.includes(field.key))
     .filter((field) => field.value.trim())
     .sort((left, right) => right.confidence - left.confidence)[0];
+
+const isReliableLiveCandidate = (field: OcrFieldResult) =>
+  (field.status === 'confirmed' || field.status === 'review') &&
+  !(field.validationErrors || []).length;
 
 const normalizeCandidate = (value: string) =>
   value.replace(/\s+/g, '').replace(/[()-]/g, '').toLowerCase();
