@@ -97,6 +97,16 @@ export function legacyDeliveryToOrder(
     },
     customerRequests: legacy.customerRequests || undefined,
     status: legacy.status,
+    proofOfDelivery:
+      legacy.status === 'completed'
+        ? {
+            status: 'completed',
+            recordedAt: now,
+            completedAt: now,
+            photoUris: [],
+            note: 'Migrated completed delivery.',
+          }
+        : undefined,
     settlement: {
       distanceKm: Number.isFinite(legacy.distanceKm)
         ? legacy.distanceKm
@@ -138,4 +148,3 @@ export function orderToLegacyDelivery(order: DeliveryOrder): LegacyDelivery {
     longitude: order.destination.longitude || 0,
   };
 }
-
