@@ -269,7 +269,7 @@
             "key": "productName",
             "value": "명",
             "confidence": 82,
-            "status": "review",
+            "status": "warning",
             "sourceText": "상품명",
             "provenance": "sourceText",
             "semanticRisks": []
@@ -451,7 +451,7 @@
             "key": "productName",
             "value": "명",
             "confidence": 82,
-            "status": "review",
+            "status": "warning",
             "sourceText": "상품명",
             "provenance": "sourceText",
             "semanticRisks": []
@@ -633,7 +633,7 @@
             "key": "productName",
             "value": "명",
             "confidence": 82,
-            "status": "review",
+            "status": "warning",
             "sourceText": "상품명",
             "provenance": "sourceText",
             "semanticRisks": []
@@ -815,7 +815,7 @@
             "key": "productName",
             "value": "코드",
             "confidence": 82,
-            "status": "review",
+            "status": "warning",
             "sourceText": "상품코드",
             "provenance": "sourceText",
             "semanticRisks": []
@@ -1361,7 +1361,7 @@
             "key": "productName",
             "value": "영",
             "confidence": 82,
-            "status": "review",
+            "status": "warning",
             "sourceText": "상품영",
             "provenance": "sourceText",
             "semanticRisks": []

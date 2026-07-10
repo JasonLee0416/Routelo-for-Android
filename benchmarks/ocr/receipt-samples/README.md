@@ -68,6 +68,29 @@ The evaluator reports:
 
 The script also accepts JSON predictions with `fullText`, `text`, or `lines`.
 
+## Prepare an Official Engine Baseline
+
+Use the same receipt image set when comparing official engines. Generate a
+prediction template first:
+
+```bash
+node scripts/init-official-baseline-run.mjs --candidate-name mlkit-v2-korean
+node scripts/init-official-baseline-run.mjs --candidate-name paddleocr-official
+node scripts/init-official-baseline-run.mjs --candidate-name clova-template
+```
+
+The script creates `tmp/ocr-runs/<candidate-name>/` with one `.txt` file per
+sample and a `run-metadata.json` file. Fill those files with the official engine
+output, then evaluate the candidate with `scripts/evaluate-text-candidate.mjs`.
+
+The first comparison target should be:
+
+1. Google ML Kit Text Recognition v2 Korean on-device output.
+2. Official PaddleOCR / PP-OCR command-line or Python output.
+3. Current Routelo PP-OCR ONNX output.
+4. Opt-in CLOVA OCR Template or Google Cloud OCR output only when local engines
+   miss required fields.
+
 ## Candidate Strategy
 
 See `model-candidates.json` and `performance-gates.json`.

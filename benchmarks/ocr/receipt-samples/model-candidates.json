@@ -2,14 +2,39 @@
   "schemaVersion": 1,
   "selectionPrinciple": "Prefer the smallest local/offline pipeline that clears the production gates. Do not switch models until the benchmark proves the current failure is model-limited rather than preprocessing/postprocessing-limited.",
   "recommendedOrder": [
+    "mlkit-v2-korean-official-baseline",
+    "paddleocr-official-baseline",
     "ppocrv5-mobile-current-plus-rotation-and-polygon",
     "ppocrv5-mobile-current",
+    "clova-template-opt-in-fallback",
     "ppocrv5-or-ppocrv6-larger-recognizer-eval",
     "dual-pass-local-ocr-forest",
     "video-frame-ocr-accumulator",
     "opt-in-multimodal-llm-review"
   ],
   "candidates": [
+    {
+      "id": "mlkit-v2-korean-official-baseline",
+      "kind": "official-on-device-baseline",
+      "runtime": "Google ML Kit Text Recognition v2 Android Korean",
+      "offline": true,
+      "appDefaultEligible": "candidate only until repo ML Kit guard is intentionally changed",
+      "description": "Use official ML Kit Text Recognition v2 Korean output as the Android on-device reference for the same receipt images.",
+      "whyTest": "The current app output is too weak to diagnose without an official Android OCR baseline.",
+      "expectedStrengths": ["official Android integration", "block/line/element structure", "offline Korean OCR"],
+      "expectedRisks": ["Android-only unless another iOS path is maintained", "repo currently blocks ML Kit production references"]
+    },
+    {
+      "id": "paddleocr-official-baseline",
+      "kind": "official-ppocr-reference",
+      "runtime": "Official PaddleOCR / PP-OCR CLI or Python pipeline",
+      "offline": true,
+      "appDefaultEligible": false,
+      "description": "Run the official PaddleOCR pipeline against the same images to compare with Routelo's ONNX/React Native PP-OCR path.",
+      "whyTest": "If official PaddleOCR succeeds while Routelo fails, the bug is likely preprocessing, DB postprocess, crop geometry, or CTC decoding.",
+      "expectedStrengths": ["closest official reference for PP-OCR behavior", "isolates app integration defects"],
+      "expectedRisks": ["not directly shippable in the mobile app", "desktop/server runtime differs from Android CPU runtime"]
+    },
     {
       "id": "ppocrv5-mobile-current",
       "kind": "baseline",
@@ -31,6 +56,17 @@
       "whyTest": "Most likely first win: it targets the known failure mode without increasing model size.",
       "expectedStrengths": ["rotation robustness", "better recognizer crops", "minimal app-size increase"],
       "expectedRisks": ["extra latency from multiple variants", "more complex postprocess"]
+    },
+    {
+      "id": "clova-template-opt-in-fallback",
+      "kind": "official-cloud-template-fallback",
+      "runtime": "NAVER Cloud CLOVA OCR Template",
+      "offline": false,
+      "appDefaultEligible": false,
+      "description": "Evaluate template-based OCR only for repeated receipt layouts and only with explicit user consent.",
+      "whyTest": "Useful when local OCR repeatedly misses required fields on known vendor receipt formats.",
+      "expectedStrengths": ["template regions", "domain vocabulary", "operational metrics before deploy"],
+      "expectedRisks": ["PII upload", "network dependency", "cost", "requires consent and privacy review"]
     },
     {
       "id": "ppocrv5-or-ppocrv6-larger-recognizer-eval",
