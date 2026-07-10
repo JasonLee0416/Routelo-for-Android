@@ -6,6 +6,7 @@ import {
 } from '../models';
 import { fixConfusableDigits } from '../ocr/confusables';
 import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
+import { applyOfficialOcrFieldGuardrails } from '../ocr/fieldValidation';
 import { buildLayoutText } from '../ocr/layout';
 import { normalizeReceipt } from '../ocr/normalize';
 
@@ -506,7 +507,7 @@ export function parseReceiptText(
       ? memoSource.value
       : '';
 
-  const fields: OcrFieldResult[] = [
+  const fields: OcrFieldResult[] = applyOfficialOcrFieldGuardrails([
     field(
       'orderingVendorName',
       orderingVendor?.value || '',
@@ -707,7 +708,7 @@ export function parseReceiptText(
         forceReview: true,
       },
     ),
-  ];
+  ]);
 
   const requiredFields = fields.filter((item) => item.required);
   const documentConfidence = Math.round(
