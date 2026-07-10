@@ -41,6 +41,12 @@ import {
 } from './models';
 import { deliveryRepository } from './repositories/native';
 import {
+  AddressVerificationResult,
+  createOfflineAddressCandidates,
+  selectAddressCandidate,
+  selectedAddressCandidate,
+} from './services/addressVerification';
+import {
   calculateFeeByAddress,
   findDistrictByAddress,
   optimizeByNearestNeighbor,
@@ -2119,6 +2125,91 @@ function LiveScanChecklist({
   );
 }
 
+function AddressVerificationPanel({
+  result,
+  onSelect,
+}: {
+  result?: AddressVerificationResult;
+  onSelect: (candidateId: string) => void;
+}) {
+  const { C, styles } = useTheme();
+  if (!result) return null;
+  const selected = selectedAddressCandidate(result);
+  return (
+    <View style={styles.addressVerificationCard}>
+      <View style={styles.addressVerificationHeader}>
+        <View style={styles.flex}>
+          <Text style={styles.addressVerificationTitle}>주소 검증</Text>
+          <Text style={styles.addressVerificationCaption}>
+            OCR 주소는 후보를 선택해야 지도·수수료 계산에 사용됩니다.
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.addressStatusBadge,
+            selected ? styles.addressStatusVerified : styles.addressStatusReview,
+          ]}
+        >
+          <Text
+            style={[
+              styles.addressStatusText,
+              { color: selected ? C.success : C.warning },
+            ]}
+          >
+            {selected ? '검증됨' : '확인 필요'}
+          </Text>
+        </View>
+      </View>
+      {result.warnings.map((warning) => (
+        <View key={warning} style={styles.addressWarningRow}>
+          <Ionicons name="warning-outline" size={14} color={C.warning} />
+          <Text style={styles.addressWarningText}>{warning}</Text>
+        </View>
+      ))}
+      {result.candidates.length ? (
+        result.candidates.map((candidate) => {
+          const active = candidate.id === result.selectedCandidateId;
+          return (
+            <Pressable
+              key={candidate.id}
+              style={[
+                styles.addressCandidateCard,
+                active && styles.addressCandidateCardSelected,
+              ]}
+              onPress={() => onSelect(candidate.id)}
+            >
+              <View style={styles.addressCandidateIcon}>
+                <Ionicons
+                  name={active ? 'checkmark-circle' : 'location-outline'}
+                  size={18}
+                  color={active ? C.success : C.primary}
+                />
+              </View>
+              <View style={styles.addressCandidateBody}>
+                <Text style={styles.addressCandidateText}>
+                  {candidate.displayAddress}
+                </Text>
+                <Text style={styles.addressCandidateMeta}>
+                  {candidate.provider} · {candidate.confidence}% ·{' '}
+                  {candidate.district || '구/시 미확인'} ·{' '}
+                  {candidate.latitude.toFixed(5)}, {candidate.longitude.toFixed(5)}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })
+      ) : (
+        <View style={styles.addressNoCandidate}>
+          <Ionicons name="alert-circle-outline" size={18} color={C.danger} />
+          <Text style={styles.addressNoCandidateText}>
+            안전하게 사용할 수 있는 주소 후보가 없습니다. 주소를 직접 수정한 뒤 다시 확인해 주세요.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function OcrScannerModal({
   visible,
   settings,
@@ -2138,8 +2229,12 @@ function OcrScannerModal({
   const [aggregateResult, setAggregateResult] = useState<OcrPipelineResult>();
   const [fields, setFields] = useState<OcrFieldResult[]>([]);
   const [vendorCheck, setVendorCheck] = useState<VendorVerification>();
+  const [addressVerification, setAddressVerification] =
+    useState<AddressVerificationResult>();
   const [liveSession, setLiveSession] = useState(createInitialLiveOcrSession);
   const liveSummary = summarizeLiveOcrSession(liveSession);
+  const deliveryAddressValue =
+    fields.find((item) => item.key === 'deliveryAddress')?.value || '';
 
   const reset = () => {
     setStage('capture');
@@ -2149,12 +2244,20 @@ function OcrScannerModal({
     setAggregateResult(undefined);
     setFields([]);
     setVendorCheck(undefined);
+    setAddressVerification(undefined);
     setLiveSession(createInitialLiveOcrSession());
   };
 
   useEffect(() => {
     if (!visible) reset();
   }, [visible]);
+
+  useEffect(() => {
+    if (stage !== 'review') return;
+    setAddressVerification(
+      createOfflineAddressCandidates(deliveryAddressValue, settings),
+    );
+  }, [deliveryAddressValue, settings, stage]);
 
   const selectImage = async (camera: boolean) => {
     const permission = camera
@@ -2245,6 +2348,7 @@ function OcrScannerModal({
   };
 
   const updateField = (key: OcrFieldKey, value: string) => {
+    if (key === 'deliveryAddress') setAddressVerification(undefined);
     setFields((current) =>
       current.map((item) =>
         item.key === key
@@ -2282,7 +2386,15 @@ function OcrScannerModal({
     }
     const strictTime = valueOf('strictTime');
     const eventTime = valueOf('eventTime');
-    const address = valueOf('deliveryAddress');
+    const verifiedAddress = selectedAddressCandidate(addressVerification);
+    if (!verifiedAddress) {
+      Alert.alert(
+        '주소 검증 필요',
+        '배송주소 후보를 선택해야 지도, 수수료, 수익 계산에 사용할 수 있습니다.',
+      );
+      return;
+    }
+    const address = verifiedAddress.displayAddress;
     const quantity = Number(valueOf('productQuantity'));
     const delivery: Delivery = {
       id: `delivery-${Date.now()}`,
@@ -2301,8 +2413,8 @@ function OcrScannerModal({
       status: 'pending',
       distanceKm: 0,
       fee: 0,
-      latitude: 0,
-      longitude: 0,
+      latitude: verifiedAddress.latitude,
+      longitude: verifiedAddress.longitude,
     };
     onRegister(delivery);
     Alert.alert('등록 완료', '검수된 OCR 정보가 오늘의 배달 목록에 추가되었습니다.');
@@ -2545,6 +2657,18 @@ function OcrScannerModal({
                         </Pressable>
                       ))}
                     </View>
+                  )}
+                  {field.key === 'deliveryAddress' && (
+                    <AddressVerificationPanel
+                      result={addressVerification}
+                      onSelect={(candidateId) =>
+                        setAddressVerification((current) =>
+                          current
+                            ? selectAddressCandidate(current, candidateId)
+                            : current,
+                        )
+                      }
+                    />
                   )}
                   {(field.key === 'orderingVendorName' ||
                     (!valueOf('orderingVendorName') && field.key === 'venueName')) &&
@@ -3801,6 +3925,91 @@ const makeStyles = (C: Palette) =>
   candidateLabel: { color: C.textMuted, fontSize: 8, fontWeight: '700' },
   candidateChip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, backgroundColor: C.surfaceAlt },
   candidateChipText: { color: C.primary, fontSize: 8, fontWeight: '700' },
+  addressVerificationCard: {
+    marginTop: 11,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1,
+    borderColor: C.outline,
+    gap: 8,
+  },
+  addressVerificationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  addressVerificationTitle: { color: C.text, fontSize: 11, fontWeight: '900' },
+  addressVerificationCaption: {
+    color: C.textMuted,
+    fontSize: 9,
+    lineHeight: 14,
+    marginTop: 3,
+  },
+  addressStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  addressStatusVerified: { backgroundColor: C.successBg, borderColor: C.success },
+  addressStatusReview: { backgroundColor: C.warningBg, borderColor: C.warning },
+  addressStatusText: { fontSize: 8, fontWeight: '900' },
+  addressWarningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  addressWarningText: {
+    flex: 1,
+    color: C.warning,
+    fontSize: 8,
+    lineHeight: 13,
+    fontWeight: '700',
+  },
+  addressCandidateCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.outline,
+  },
+  addressCandidateCardSelected: {
+    borderColor: C.success,
+    backgroundColor: C.successBg,
+  },
+  addressCandidateIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 11,
+    backgroundColor: C.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addressCandidateBody: { flex: 1 },
+  addressCandidateText: { color: C.text, fontSize: 10, fontWeight: '800', lineHeight: 15 },
+  addressCandidateMeta: {
+    color: C.textMuted,
+    fontSize: 8,
+    lineHeight: 13,
+    marginTop: 3,
+    fontWeight: '700',
+  },
+  addressNoCandidate: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    borderRadius: 13,
+    backgroundColor: C.dangerBg,
+  },
+  addressNoCandidateText: {
+    flex: 1,
+    color: C.danger,
+    fontSize: 9,
+    lineHeight: 14,
+    fontWeight: '700',
+  },
   vendorCheckRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 9 },
   vendorCheckText: { flex: 1, color: C.textMuted, fontSize: 9, fontWeight: '700' },
   privacyNotice: {
