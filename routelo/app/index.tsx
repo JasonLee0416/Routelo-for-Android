@@ -55,6 +55,8 @@ import { NAV_APP_LABEL, openNavigation } from './services/navigation';
 import {
   clearProofOfDelivery,
   completeDeliveryWithProof,
+  failDeliveryWithProof,
+  markDeliveryForRevisitWithProof,
 } from './services/proofOfDelivery';
 import { summarizeDailyProfit } from './services/profit';
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
@@ -254,6 +256,9 @@ function isEventDelivery(delivery: Delivery) {
 }
 
 function priorityOf(delivery: Delivery) {
+  if (delivery.status === 'failed' || delivery.status === 'revisitNeeded') {
+    return 'risk';
+  }
   if (isEventDelivery(delivery)) return 'urgent';
   if (delivery.distanceKm >= 10) return 'risk';
   return delivery.status === 'completed' ? 'completed' : 'normal';
@@ -262,21 +267,48 @@ function priorityOf(delivery: Delivery) {
 function StatusBadge({ status }: { status: Delivery['status'] }) {
   const { C, styles } = useTheme();
   const completed = status === 'completed';
+  const failed = status === 'failed';
+  const revisit = status === 'revisitNeeded';
+  const color = completed
+    ? C.success
+    : failed
+      ? C.danger
+      : revisit
+        ? C.warning
+        : C.primary;
+  const label = completed
+    ? '완료'
+    : failed
+      ? '배송 실패'
+      : revisit
+        ? '재방문 필요'
+        : '배달 대기';
   return (
-    <View style={[styles.badge, completed ? styles.successBadge : styles.waitBadge]}>
+    <View
+      style={[
+        styles.badge,
+        completed
+          ? styles.successBadge
+          : failed
+            ? styles.dangerBadge
+            : revisit
+              ? styles.warningBadge
+              : styles.waitBadge,
+      ]}
+    >
       <View
         style={[
           styles.badgeDot,
-          { backgroundColor: completed ? C.success : C.primary },
+          { backgroundColor: color },
         ]}
       />
       <Text
         style={[
           styles.badgeText,
-          { color: completed ? C.success : C.primary },
+          { color },
         ]}
       >
-        {completed ? '완료' : '배달 대기'}
+        {label}
       </Text>
     </View>
   );
@@ -1934,11 +1966,15 @@ function DeliveryDetailSheet({
   visible,
   onClose,
   onToggle,
+  onFail,
+  onRevisit,
 }: {
   delivery?: Delivery;
   visible: boolean;
   onClose: () => void;
   onToggle: () => void;
+  onFail: () => void;
+  onRevisit: () => void;
 }) {
   const { C, styles } = useTheme();
   const insets = useSafeAreaInsets();
@@ -2000,6 +2036,20 @@ function DeliveryDetailSheet({
               />
               <Text style={styles.primaryButtonText}>
                 {delivery.status === 'completed' ? '대기로 변경' : '배송 완료'}
+              </Text>
+            </Pressable>
+          </View>
+          <View style={styles.sheetActions}>
+            <Pressable style={styles.secondaryButton} onPress={onFail}>
+              <Ionicons name="close-circle-outline" size={18} color={C.danger} />
+              <Text style={[styles.secondaryButtonText, { color: C.danger }]}>
+                배송 실패
+              </Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={onRevisit}>
+              <Ionicons name="return-up-forward-outline" size={18} color={C.warning} />
+              <Text style={[styles.secondaryButtonText, { color: C.warning }]}>
+                재방문 필요
               </Text>
             </Pressable>
           </View>
@@ -2798,12 +2848,45 @@ export default function RouteloApp() {
     await deliveryRepository.save(nextOrder);
     setSelectedDelivery((current) =>
       current
-        ? {
-            ...current,
-            status: current.status === 'completed' ? 'pending' : 'completed',
-          }
+        ? orderToLegacyDelivery(nextOrder)
         : current,
     );
+  };
+
+  const updateSelectedOrder = async (nextOrder: DeliveryOrder) => {
+    setOrders((current) =>
+      current.map((item) => (item.id === nextOrder.id ? nextOrder : item)),
+    );
+    await deliveryRepository.save(nextOrder);
+    setSelectedDelivery(orderToLegacyDelivery(nextOrder));
+  };
+
+  const markSelectedFailed = async () => {
+    if (!selectedDelivery) return;
+    const currentOrder = orders.find((item) => item.id === selectedDelivery.id);
+    if (!currentOrder) return;
+    const nextOrder = failDeliveryWithProof(
+      currentOrder,
+      {
+        failureReason: 'Marked failed from delivery detail.',
+        note: 'Driver selected failed delivery state.',
+      },
+    );
+    await updateSelectedOrder(nextOrder);
+  };
+
+  const markSelectedRevisit = async () => {
+    if (!selectedDelivery) return;
+    const currentOrder = orders.find((item) => item.id === selectedDelivery.id);
+    if (!currentOrder) return;
+    const nextOrder = markDeliveryForRevisitWithProof(
+      currentOrder,
+      {
+        failureReason: 'Marked revisit-needed from delivery detail.',
+        note: 'Driver selected revisit-needed state.',
+      },
+    );
+    await updateSelectedOrder(nextOrder);
   };
 
   const screen = useMemo(() => {
@@ -2929,6 +3012,8 @@ export default function RouteloApp() {
         visible={Boolean(selectedDelivery)}
         onClose={() => setSelectedDelivery(undefined)}
         onToggle={toggleSelected}
+        onFail={markSelectedFailed}
+        onRevisit={markSelectedRevisit}
       />
       <OcrScannerModal
         visible={scannerVisible}
@@ -3401,6 +3486,8 @@ const makeStyles = (C: Palette) =>
   },
   successBadge: { backgroundColor: C.successBg },
   waitBadge: { backgroundColor: C.primaryContainer },
+  warningBadge: { backgroundColor: C.warningBg },
+  dangerBadge: { backgroundColor: C.dangerBg },
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
   badgeText: { fontSize: 9, fontWeight: '800' },
   filterSegment: {

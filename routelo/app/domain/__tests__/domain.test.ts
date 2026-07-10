@@ -49,6 +49,21 @@ describe('canonical delivery domain', () => {
     expect(order.schedule.timePrecision).toBe('unknown');
   });
 
+  it('preserves failed and revisit-needed states for UI projections', () => {
+    expect(
+      legacyDeliveryToOrder({
+        ...legacy,
+        status: 'failed',
+      }).status,
+    ).toBe('failed');
+    expect(
+      legacyDeliveryToOrder({
+        ...legacy,
+        status: 'revisitNeeded',
+      }).status,
+    ).toBe('revisitNeeded');
+  });
+
   it('creates calendar projections without parsing display strings', () => {
     const order = legacyDeliveryToOrder(legacy);
     const item = toCalendarDeliveryItem(order);
