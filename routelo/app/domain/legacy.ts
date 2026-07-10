@@ -18,7 +18,7 @@ export type LegacyDelivery = {
   deliveryAddress: string;
   customerRequests: string;
   recipientTel: string;
-  status: 'pending' | 'completed';
+  status: 'pending' | 'completed' | 'failed' | 'revisitNeeded';
   distanceKm: number;
   fee: number;
   latitude: number;
@@ -96,7 +96,9 @@ export function legacyDeliveryToOrder(
       telephone: legacy.recipientTel || undefined,
     },
     customerRequests: legacy.customerRequests || undefined,
-    status: legacy.status,
+    status: legacy.status === 'failed' || legacy.status === 'revisitNeeded'
+      ? legacy.status
+      : legacy.status,
     proofOfDelivery:
       legacy.status === 'completed'
         ? {
@@ -141,7 +143,12 @@ export function orderToLegacyDelivery(order: DeliveryOrder): LegacyDelivery {
     deliveryAddress: order.destination.address || '',
     customerRequests: order.customerRequests || '',
     recipientTel: order.recipient.telephone || '',
-    status: order.status === 'completed' ? 'completed' : 'pending',
+    status:
+      order.status === 'completed' ||
+      order.status === 'failed' ||
+      order.status === 'revisitNeeded'
+        ? order.status
+        : 'pending',
     distanceKm: order.settlement.distanceKm || 0,
     fee: order.settlement.fee || 0,
     latitude: order.destination.latitude || 0,

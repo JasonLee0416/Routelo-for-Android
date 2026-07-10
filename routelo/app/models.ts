@@ -1,6 +1,10 @@
 import type { LegacyDelivery } from './domain';
 
-export type DeliveryStatus = 'pending' | 'completed';
+export type DeliveryStatus =
+  | 'pending'
+  | 'completed'
+  | 'failed'
+  | 'revisitNeeded';
 
 // Compatibility shape for existing screens. Canonical persistence uses
 // DeliveryOrder from app/domain and is converted through explicit adapters.
