@@ -1,0 +1,115 @@
+import { DeliveryOrder, ProofOfDelivery } from '../domain';
+
+export type CompleteDeliveryProofInput = {
+  completedAt?: string;
+  photoUris?: string[];
+  note?: string;
+  signatureUri?: string;
+};
+
+export type FailedDeliveryProofInput = {
+  recordedAt?: string;
+  photoUris?: string[];
+  note?: string;
+  failureReason: string;
+};
+
+export type RevisitDeliveryProofInput = {
+  recordedAt?: string;
+  photoUris?: string[];
+  note?: string;
+  failureReason: string;
+};
+
+const cleanText = (value?: string) => value?.trim() || undefined;
+
+function proofBase(
+  status: ProofOfDelivery['status'],
+  recordedAt: string,
+  photoUris: string[] = [],
+): ProofOfDelivery {
+  return {
+    status,
+    recordedAt,
+    photoUris: photoUris.filter(Boolean),
+  };
+}
+
+export function completeDeliveryWithProof(
+  order: DeliveryOrder,
+  input: CompleteDeliveryProofInput = {},
+  now = new Date().toISOString(),
+): DeliveryOrder {
+  const completedAt = input.completedAt || now;
+  return {
+    ...order,
+    status: 'completed',
+    schedule: {
+      ...order.schedule,
+      completedAt,
+    },
+    proofOfDelivery: {
+      ...proofBase('completed', now, input.photoUris),
+      completedAt,
+      note: cleanText(input.note),
+      signatureUri: cleanText(input.signatureUri),
+    },
+    updatedAt: now,
+  };
+}
+
+export function failDeliveryWithProof(
+  order: DeliveryOrder,
+  input: FailedDeliveryProofInput,
+  now = new Date().toISOString(),
+): DeliveryOrder {
+  const reason = cleanText(input.failureReason);
+  if (!reason) throw new Error('Failed delivery proof requires a failure reason.');
+  const recordedAt = input.recordedAt || now;
+  return {
+    ...order,
+    status: 'failed',
+    proofOfDelivery: {
+      ...proofBase('failed', recordedAt, input.photoUris),
+      note: cleanText(input.note),
+      failureReason: reason,
+    },
+    updatedAt: now,
+  };
+}
+
+export function markDeliveryForRevisitWithProof(
+  order: DeliveryOrder,
+  input: RevisitDeliveryProofInput,
+  now = new Date().toISOString(),
+): DeliveryOrder {
+  const reason = cleanText(input.failureReason);
+  if (!reason) throw new Error('Revisit proof requires a reason.');
+  const recordedAt = input.recordedAt || now;
+  return {
+    ...order,
+    status: 'revisitNeeded',
+    proofOfDelivery: {
+      ...proofBase('revisitNeeded', recordedAt, input.photoUris),
+      note: cleanText(input.note),
+      failureReason: reason,
+    },
+    updatedAt: now,
+  };
+}
+
+export function clearProofOfDelivery(
+  order: DeliveryOrder,
+  now = new Date().toISOString(),
+): DeliveryOrder {
+  return {
+    ...order,
+    status: 'pending',
+    schedule: {
+      ...order.schedule,
+      completedAt: undefined,
+    },
+    proofOfDelivery: undefined,
+    updatedAt: now,
+  };
+}

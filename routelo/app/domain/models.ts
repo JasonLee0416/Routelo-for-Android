@@ -6,6 +6,8 @@ export type DeliveryStatus =
   | 'reviewRequired'
   | 'pending'
   | 'completed'
+  | 'failed'
+  | 'revisitNeeded'
   | 'cancelled';
 
 export type SchedulePrecision =
@@ -68,6 +70,18 @@ export type SettlementInfo = {
   district?: string;
 };
 
+export type ProofOfDeliveryStatus = 'completed' | 'failed' | 'revisitNeeded';
+
+export type ProofOfDelivery = {
+  status: ProofOfDeliveryStatus;
+  recordedAt: string;
+  completedAt?: string;
+  photoUris: string[];
+  note?: string;
+  failureReason?: string;
+  signatureUri?: string;
+};
+
 export type DeliveryOrder = {
   schemaVersion: number;
   id: string;
@@ -80,6 +94,7 @@ export type DeliveryOrder = {
   recipient: RecipientInfo;
   customerRequests?: string;
   status: DeliveryStatus;
+  proofOfDelivery?: ProofOfDelivery;
   settlement: SettlementInfo;
   source: {
     type: 'manual' | 'ocr' | 'migration' | 'sample';

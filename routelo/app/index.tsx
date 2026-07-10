@@ -52,6 +52,10 @@ import {
   optimizeByNearestNeighbor,
 } from './services/maps';
 import { NAV_APP_LABEL, openNavigation } from './services/navigation';
+import {
+  clearProofOfDelivery,
+  completeDeliveryWithProof,
+} from './services/proofOfDelivery';
 import { summarizeDailyProfit } from './services/profit';
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
@@ -2780,15 +2784,14 @@ export default function RouteloApp() {
     );
     if (!currentOrder) return;
     const completed = currentOrder.status !== 'completed';
-    const nextOrder: DeliveryOrder = {
-      ...currentOrder,
-      status: completed ? 'completed' : 'pending',
-      schedule: {
-        ...currentOrder.schedule,
-        completedAt: completed ? new Date().toISOString() : undefined,
-      },
-      updatedAt: new Date().toISOString(),
-    };
+    const now = new Date().toISOString();
+    const nextOrder: DeliveryOrder = completed
+      ? completeDeliveryWithProof(
+          currentOrder,
+          { completedAt: now, note: 'Marked complete from delivery detail.' },
+          now,
+        )
+      : clearProofOfDelivery(currentOrder, now);
     setOrders((current) =>
       current.map((item) => (item.id === nextOrder.id ? nextOrder : item)),
     );
