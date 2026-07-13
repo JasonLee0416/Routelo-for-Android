@@ -23,6 +23,16 @@ export type RevisitDeliveryProofInput = {
 
 const cleanText = (value?: string) => value?.trim() || undefined;
 
+// 실패/재방문 사유는 운전자가 직접 입력한 값만 신뢰한다. UI 제출 게이팅과
+// 서비스 검증이 같은 규칙을 쓰도록 순수 헬퍼로 노출한다(하드코딩 기본 사유 금지).
+export function normalizeProofReason(value?: string): string | undefined {
+  return cleanText(value);
+}
+
+export function hasProofReason(value?: string): boolean {
+  return Boolean(normalizeProofReason(value));
+}
+
 function proofBase(
   status: ProofOfDelivery['status'],
   recordedAt: string,

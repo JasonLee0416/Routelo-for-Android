@@ -56,6 +56,7 @@ import {
   clearProofOfDelivery,
   completeDeliveryWithProof,
   failDeliveryWithProof,
+  hasProofReason,
   markDeliveryForRevisitWithProof,
 } from './services/proofOfDelivery';
 import { summarizeDailyProfit } from './services/profit';
@@ -1973,11 +1974,29 @@ function DeliveryDetailSheet({
   visible: boolean;
   onClose: () => void;
   onToggle: () => void;
-  onFail: () => void;
-  onRevisit: () => void;
+  onFail: (reason: string) => void;
+  onRevisit: (reason: string) => void;
 }) {
   const { C, styles } = useTheme();
   const insets = useSafeAreaInsets();
+  // 실패/재방문은 하드코딩 기본 사유 대신 운전자가 입력한 사유로만 커밋한다.
+  const [reasonMode, setReasonMode] = useState<null | 'failed' | 'revisit'>(
+    null,
+  );
+  const [reasonText, setReasonText] = useState('');
+  useEffect(() => {
+    if (!visible) {
+      setReasonMode(null);
+      setReasonText('');
+    }
+  }, [visible]);
+  const submitReason = () => {
+    if (!hasProofReason(reasonText)) return;
+    if (reasonMode === 'failed') onFail(reasonText);
+    else if (reasonMode === 'revisit') onRevisit(reasonText);
+    setReasonMode(null);
+    setReasonText('');
+  };
   if (!delivery) return null;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -2040,19 +2059,67 @@ function DeliveryDetailSheet({
             </Pressable>
           </View>
           <View style={styles.sheetActions}>
-            <Pressable style={styles.secondaryButton} onPress={onFail}>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => setReasonMode('failed')}
+            >
               <Ionicons name="close-circle-outline" size={18} color={C.danger} />
               <Text style={[styles.secondaryButtonText, { color: C.danger }]}>
                 배송 실패
               </Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={onRevisit}>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => setReasonMode('revisit')}
+            >
               <Ionicons name="return-up-forward-outline" size={18} color={C.warning} />
               <Text style={[styles.secondaryButtonText, { color: C.warning }]}>
                 재방문 필요
               </Text>
             </Pressable>
           </View>
+          {reasonMode && (
+            <View style={styles.sheetInfoBlock}>
+              <Text style={styles.sheetInfoLabel}>
+                {reasonMode === 'failed' ? '실패 사유' : '재방문 사유'}
+              </Text>
+              <TextInput
+                style={[styles.onboardingInput, { minHeight: 72 }]}
+                value={reasonText}
+                onChangeText={setReasonText}
+                multiline
+                autoFocus
+                placeholder={
+                  reasonMode === 'failed'
+                    ? '예: 수령인 부재, 주소 오류'
+                    : '예: 오후 재방문 요청'
+                }
+                placeholderTextColor="#6B7280"
+              />
+              <View style={[styles.sheetActions, { marginTop: 12 }]}>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    setReasonMode(null);
+                    setReasonText('');
+                  }}
+                >
+                  <Text style={styles.secondaryButtonText}>취소</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.primaryButton,
+                    !hasProofReason(reasonText) && { opacity: 0.5 },
+                  ]}
+                  disabled={!hasProofReason(reasonText)}
+                  onPress={submitReason}
+                >
+                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>기록</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -2861,31 +2928,25 @@ export default function RouteloApp() {
     setSelectedDelivery(orderToLegacyDelivery(nextOrder));
   };
 
-  const markSelectedFailed = async () => {
+  const markSelectedFailed = async (reason: string) => {
     if (!selectedDelivery) return;
     const currentOrder = orders.find((item) => item.id === selectedDelivery.id);
     if (!currentOrder) return;
-    const nextOrder = failDeliveryWithProof(
-      currentOrder,
-      {
-        failureReason: 'Marked failed from delivery detail.',
-        note: 'Driver selected failed delivery state.',
-      },
-    );
+    const nextOrder = failDeliveryWithProof(currentOrder, {
+      failureReason: reason,
+      note: '운전자가 배송 실패로 기록함.',
+    });
     await updateSelectedOrder(nextOrder);
   };
 
-  const markSelectedRevisit = async () => {
+  const markSelectedRevisit = async (reason: string) => {
     if (!selectedDelivery) return;
     const currentOrder = orders.find((item) => item.id === selectedDelivery.id);
     if (!currentOrder) return;
-    const nextOrder = markDeliveryForRevisitWithProof(
-      currentOrder,
-      {
-        failureReason: 'Marked revisit-needed from delivery detail.',
-        note: 'Driver selected revisit-needed state.',
-      },
-    );
+    const nextOrder = markDeliveryForRevisitWithProof(currentOrder, {
+      failureReason: reason,
+      note: '운전자가 재방문 필요로 기록함.',
+    });
     await updateSelectedOrder(nextOrder);
   };
 

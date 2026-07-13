@@ -3,7 +3,9 @@ import {
   clearProofOfDelivery,
   completeDeliveryWithProof,
   failDeliveryWithProof,
+  hasProofReason,
   markDeliveryForRevisitWithProof,
+  normalizeProofReason,
 } from '../proofOfDelivery';
 
 const order: DeliveryOrder = {
@@ -25,6 +27,17 @@ const order: DeliveryOrder = {
   createdAt: '2026-07-10T00:00:00.000Z',
   updatedAt: '2026-07-10T00:00:00.000Z',
 };
+
+describe('proof reason helpers', () => {
+  it('normalizes reasons and rejects blank/whitespace input', () => {
+    expect(normalizeProofReason('  수령인 부재 ')).toBe('수령인 부재');
+    expect(normalizeProofReason('   ')).toBeUndefined();
+    expect(normalizeProofReason(undefined)).toBeUndefined();
+    expect(hasProofReason('수령인 부재')).toBe(true);
+    expect(hasProofReason('   ')).toBe(false);
+    expect(hasProofReason(undefined)).toBe(false);
+  });
+});
 
 describe('proof of delivery helpers', () => {
   it('marks a delivery completed with local proof evidence', () => {
