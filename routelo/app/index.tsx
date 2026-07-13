@@ -1984,12 +1984,12 @@ function DeliveryDetailSheet({
     null,
   );
   const [reasonText, setReasonText] = useState('');
+  // 시트가 닫히거나 다른 배송으로 바뀌면 입력 상태를 리셋한다(사유가 엉뚱한
+  // 배송에 남지 않도록 delivery.id에도 의존).
   useEffect(() => {
-    if (!visible) {
-      setReasonMode(null);
-      setReasonText('');
-    }
-  }, [visible]);
+    setReasonMode(null);
+    setReasonText('');
+  }, [visible, delivery?.id]);
   const submitReason = () => {
     if (!hasProofReason(reasonText)) return;
     if (reasonMode === 'failed') onFail(reasonText);
