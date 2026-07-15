@@ -105,7 +105,7 @@ export type DeliveryOrder = {
   updatedAt: string;
 };
 
-export type OcrEngine = 'ppocrv5' | 'fixture';
+export type OcrEngine = 'ppocrv5' | 'clova' | 'fixture';
 
 export type OcrPoint = { x: number; y: number };
 

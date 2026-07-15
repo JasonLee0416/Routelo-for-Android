@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
@@ -34,12 +35,19 @@ import {
 } from './domain';
 import {
   Delivery,
+  ContactLog,
   FuelLog,
+  MileageLog,
   OcrFieldKey,
   OcrFieldResult,
   OcrPipelineResult,
 } from './models';
-import { deliveryRepository } from './repositories/native';
+import {
+  contactLogRepository,
+  deliveryRepository,
+  fuelLogRepository,
+  mileageLogRepository,
+} from './repositories/native';
 import {
   AddressVerificationResult,
   createOfflineAddressCandidates,
@@ -53,6 +61,7 @@ import {
 } from './services/maps';
 import { NAV_APP_LABEL, openNavigation } from './services/navigation';
 import {
+  appendProofPhoto,
   clearProofOfDelivery,
   completeDeliveryWithProof,
   failDeliveryWithProof,
@@ -60,6 +69,14 @@ import {
   markDeliveryForRevisitWithProof,
 } from './services/proofOfDelivery';
 import { summarizeDailyProfit } from './services/profit';
+import { buildBackupJson, parseBackup } from './services/backup';
+import { completionPhotoUri, persistCompletionPhoto } from './services/completionPhoto';
+import { summarizeEfficiencyByVehicle } from './services/efficiency';
+import { buildDailyProfitCsv } from './services/export';
+import { createFuelLog } from './services/fuel';
+import { createMileageLog } from './services/mileage';
+import { buildPlannedNotifications } from './services/notificationPlan';
+import { syncScheduledNotifications } from './services/notifications';
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
@@ -903,21 +920,35 @@ type CalendarMode = 'month' | 'week' | 'day';
 const formatDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
+const accountVehicleLabel = (value?: string) => value?.trim() || undefined;
+
 const timeLabel = (value?: string) =>
   value?.match(/T(\d{2}:\d{2})/)?.[1] || '';
 
 function CalendarScreen({
   orders,
   fuelLogs,
+  mileageLogs,
   settings,
   onDeliveryPress,
   onNotifications,
+  onAddFuelLog,
+  onAddMileageLog,
+  onExportCsv,
+  onExportBackup,
+  onRestoreBackup,
 }: {
   orders: DeliveryOrder[];
   fuelLogs: FuelLog[];
+  mileageLogs: MileageLog[];
   settings: RouteloSettings;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
+  onAddFuelLog: (log: FuelLog) => void;
+  onAddMileageLog: (log: MileageLog) => void;
+  onExportCsv: () => void;
+  onExportBackup: () => void;
+  onRestoreBackup: () => void;
 }) {
   const { C, styles } = useTheme();
   const { showFullAddressInList } = usePrivacy();
@@ -962,6 +993,62 @@ function CalendarScreen({
     () => summarizeDailyProfit(orders, fuelLogs, settings),
     [fuelLogs, orders, settings],
   );
+  const selectedFuelLogs = fuelLogs.filter((log) => log.date === selectedDate);
+  const selectedMileageLogs = mileageLogs.filter((log) => log.date === selectedDate);
+  const [fuelLiters, setFuelLiters] = useState('');
+  const [fuelAmount, setFuelAmount] = useState('');
+  const [fuelOdometer, setFuelOdometer] = useState('');
+  const [mileageOdometer, setMileageOdometer] = useState('');
+  const [dailyDistance, setDailyDistance] = useState('');
+  const vehicleLabel =
+    accountVehicleLabel(settings.costs.vehicleModel) || '기본 차량';
+  const vehicleEfficiency = useMemo(
+    () =>
+      summarizeEfficiencyByVehicle(fuelLogs, mileageLogs, {
+        defaultLabel: vehicleLabel,
+      }),
+    [fuelLogs, mileageLogs, vehicleLabel],
+  );
+  const numberOf = (value: string) =>
+    Number(value.replace(/[^\d.]/g, ''));
+  const submitFuelLog = () => {
+    try {
+      const log = createFuelLog(
+        {
+          date: selectedDate,
+          liters: numberOf(fuelLiters),
+          amount: numberOf(fuelAmount),
+          odometerKm: numberOf(fuelOdometer) || undefined,
+          vehicle: vehicleLabel,
+        },
+        { id: `fuel-${Date.now()}` },
+      );
+      onAddFuelLog(log);
+      setFuelLiters('');
+      setFuelAmount('');
+      setFuelOdometer('');
+    } catch (error) {
+      Alert.alert('주유 기록 확인', error instanceof Error ? error.message : '입력값을 확인해주세요.');
+    }
+  };
+  const submitMileageLog = () => {
+    try {
+      const log = createMileageLog(
+        {
+          date: selectedDate,
+          odometerKm: numberOf(mileageOdometer),
+          dailyDistanceKm: numberOf(dailyDistance),
+          vehicle: vehicleLabel,
+        },
+        { id: `mileage-${Date.now()}` },
+      );
+      onAddMileageLog(log);
+      setMileageOdometer('');
+      setDailyDistance('');
+    } catch (error) {
+      Alert.alert('주행거리 기록 확인', error instanceof Error ? error.message : '입력값을 확인해주세요.');
+    }
+  };
   const selectedSummary = dailySummaries.get(selectedDate) || {
     revenue: 0,
     fuelCost: 0,
@@ -1134,6 +1221,95 @@ function CalendarScreen({
           </Text>
         </View>
       </View>
+      <View style={styles.financeActionRow}>
+        <Pressable style={styles.secondaryButton} onPress={onExportCsv}>
+          <Ionicons name="download-outline" size={18} color={C.primary} />
+          <Text style={styles.secondaryButtonText}>CSV 내보내기</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={onExportBackup}>
+          <Ionicons name="archive-outline" size={18} color={C.primary} />
+          <Text style={styles.secondaryButtonText}>백업 저장</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={onRestoreBackup}>
+          <Ionicons name="cloud-upload-outline" size={18} color={C.primary} />
+          <Text style={styles.secondaryButtonText}>백업 복원</Text>
+        </Pressable>
+      </View>
+      <View style={styles.financeInputCard}>
+        <Text style={styles.sheetInfoLabel}>선택 날짜 주유 기록</Text>
+        <View style={styles.financeInputGrid}>
+          <TextInput
+            style={styles.financeInput}
+            value={fuelLiters}
+            onChangeText={setFuelLiters}
+            keyboardType="decimal-pad"
+            placeholder="주유량 L"
+            placeholderTextColor="#6B7280"
+          />
+          <TextInput
+            style={styles.financeInput}
+            value={fuelAmount}
+            onChangeText={setFuelAmount}
+            keyboardType="number-pad"
+            placeholder="주유금액 원"
+            placeholderTextColor="#6B7280"
+          />
+          <TextInput
+            style={styles.financeInput}
+            value={fuelOdometer}
+            onChangeText={setFuelOdometer}
+            keyboardType="decimal-pad"
+            placeholder="계기판 km"
+            placeholderTextColor="#6B7280"
+          />
+        </View>
+        <Pressable style={styles.scanPrimaryButton} onPress={submitFuelLog}>
+          <Text style={styles.scanPrimaryButtonText}>주유 기록 추가</Text>
+        </Pressable>
+        <Text style={styles.financeHint}>
+          {selectedFuelLogs.length}건 기록 · {formatWon(selectedFuelLogs.reduce((sum, log) => sum + log.amount, 0))}
+        </Text>
+      </View>
+      <View style={styles.financeInputCard}>
+        <Text style={styles.sheetInfoLabel}>선택 날짜 주행거리 기록</Text>
+        <View style={styles.financeInputGrid}>
+          <TextInput
+            style={styles.financeInput}
+            value={mileageOdometer}
+            onChangeText={setMileageOdometer}
+            keyboardType="decimal-pad"
+            placeholder="현재 계기판 km"
+            placeholderTextColor="#6B7280"
+          />
+          <TextInput
+            style={styles.financeInput}
+            value={dailyDistance}
+            onChangeText={setDailyDistance}
+            keyboardType="decimal-pad"
+            placeholder="당일 주행 km"
+            placeholderTextColor="#6B7280"
+          />
+        </View>
+        <Pressable style={styles.scanPrimaryButton} onPress={submitMileageLog}>
+          <Text style={styles.scanPrimaryButtonText}>주행거리 기록 추가</Text>
+        </Pressable>
+        <Text style={styles.financeHint}>
+          {selectedMileageLogs.length}건 기록 · {selectedMileageLogs.reduce((sum, log) => sum + log.dailyDistanceKm, 0).toLocaleString('ko-KR')}km
+        </Text>
+      </View>
+      {vehicleEfficiency.length > 0 && (
+        <View style={styles.financeInputCard}>
+          <Text style={styles.sheetInfoLabel}>차량별 실측 연비/비용</Text>
+          {vehicleEfficiency.map((item) => (
+            <View key={item.vehicle} style={styles.financeMetricRow}>
+              <Text style={styles.financeMetricVehicle}>{item.vehicle}</Text>
+              <Text style={styles.financeHint}>
+                {item.summary.kmPerLiter ?? '-'}km/L · {item.summary.costPerKm ? formatWon(item.summary.costPerKm) : '-'} / km
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
       {selectedItems.length === 0 ? (
         <View style={styles.calendarEmpty}>
           <Ionicons name="calendar-clear-outline" size={30} color={C.textMuted} />
@@ -1964,18 +2140,24 @@ function OnboardingModal({
 
 function DeliveryDetailSheet({
   delivery,
+  order,
   visible,
   onClose,
   onToggle,
   onFail,
   onRevisit,
+  onAttachPhoto,
+  onCallRecipient,
 }: {
   delivery?: Delivery;
+  order?: DeliveryOrder;
   visible: boolean;
   onClose: () => void;
   onToggle: () => void;
   onFail: (reason: string) => void;
   onRevisit: (reason: string) => void;
+  onAttachPhoto: (source: 'camera' | 'library') => void;
+  onCallRecipient: () => void;
 }) {
   const { C, styles } = useTheme();
   const insets = useSafeAreaInsets();
@@ -2039,10 +2221,48 @@ function DeliveryDetailSheet({
             <Text style={styles.sheetInfoLabel}>요청사항</Text>
             <Text style={styles.sheetInfoText}>{delivery.customerRequests}</Text>
           </View>
+          <View style={styles.sheetInfoBlock}>
+            <Text style={styles.sheetInfoLabel}>배송 증거 사진</Text>
+            {(order?.proofOfDelivery?.photoUris.length || 0) > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.proofPhotoRow}>
+                  {order?.proofOfDelivery?.photoUris.map((uri) => (
+                    <Image
+                      key={uri}
+                      source={{
+                        uri: uri.startsWith('file:') ? uri : completionPhotoUri(uri),
+                      }}
+                      style={styles.proofPhotoThumb}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            ) : (
+              <Text style={styles.sheetInfoText}>
+                아직 첨부된 완료/실패 증거 사진이 없습니다.
+              </Text>
+            )}
+            <View style={[styles.sheetActions, { marginTop: 12 }]}>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => onAttachPhoto('camera')}
+              >
+                <Ionicons name="camera-outline" size={18} color={C.primary} />
+                <Text style={styles.secondaryButtonText}>촬영</Text>
+              </Pressable>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => onAttachPhoto('library')}
+              >
+                <Ionicons name="image-outline" size={18} color={C.primary} />
+                <Text style={styles.secondaryButtonText}>갤러리</Text>
+              </Pressable>
+            </View>
+          </View>
           <View style={styles.sheetActions}>
             <Pressable
               style={styles.secondaryButton}
-              onPress={() => Linking.openURL(`tel:${delivery.recipientTel}`)}
+              onPress={onCallRecipient}
             >
               <Ionicons name="call-outline" size={18} color={C.primary} />
               <Text style={styles.secondaryButtonText}>수령인 전화</Text>
@@ -2720,6 +2940,22 @@ function OcrScannerModal({
                   </Text>
                 </View>
               </View>
+              {result.cloudFallback?.trigger && (
+                <View style={styles.reviewGuide}>
+                  <Ionicons name="cloud-upload-outline" size={19} color={C.warning} />
+                  <Text style={styles.reviewGuideText}>
+                    CLOVA fallback 또는 수동 확인 권장: {result.cloudFallback.reasons.slice(0, 3).join(' / ')}
+                  </Text>
+                </View>
+              )}
+              {!!result.conflicts?.length && (
+                <View style={styles.reviewGuide}>
+                  <Ionicons name="warning-outline" size={19} color={C.danger} />
+                  <Text style={styles.reviewGuideText}>
+                    OCR 충돌 감지: {result.conflicts.map((item) => item.message).join(' / ')}
+                  </Text>
+                </View>
+              )}
               <LiveScanChecklist session={liveSession} />
               <View style={styles.reviewGuide}>
                 <Ionicons name="information-circle-outline" size={19} color={C.primary} />
@@ -2863,7 +3099,9 @@ export default function RouteloApp() {
   const [settings, setSettings] = useState<RouteloSettings>(
     DEFAULT_ROUTELO_SETTINGS,
   );
-  const [fuelLogs] = useState<FuelLog[]>([]);
+  const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+  const [mileageLogs, setMileageLogs] = useState<MileageLog[]>([]);
+  const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
 
   useEffect(() => {
     deliveryRepository
@@ -2892,7 +3130,22 @@ export default function RouteloApp() {
       .catch(() => undefined);
   }, []);
 
-  const notificationCount = 3;
+  useEffect(() => {
+    fuelLogRepository.list().then(setFuelLogs).catch(() => undefined);
+    mileageLogRepository.list().then(setMileageLogs).catch(() => undefined);
+    contactLogRepository.list().then(setContactLogs).catch(() => undefined);
+  }, []);
+
+  const plannedNotifications = useMemo(
+    () => buildPlannedNotifications(orders, settings.notifications),
+    [orders, settings.notifications],
+  );
+  const notificationCount = plannedNotifications.length;
+
+  useEffect(() => {
+    syncScheduledNotifications(plannedNotifications).catch(() => undefined);
+  }, [plannedNotifications]);
+
   const openNotifications = () => setActiveTab('notifications');
   const toggleSelected = async () => {
     if (!selectedDelivery) return;
@@ -2950,6 +3203,105 @@ export default function RouteloApp() {
     await updateSelectedOrder(nextOrder);
   };
 
+  const addFuelLog = async (log: FuelLog) => {
+    setFuelLogs((current) => [...current, log]);
+    await fuelLogRepository.save(log);
+  };
+
+  const addMileageLog = async (log: MileageLog) => {
+    setMileageLogs((current) => [...current, log]);
+    await mileageLogRepository.save(log);
+  };
+
+  const attachSelectedPhoto = async (source: 'camera' | 'library') => {
+    if (!selectedDelivery) return;
+    const currentOrder = orders.find((item) => item.id === selectedDelivery.id);
+    if (!currentOrder) return;
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.88,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.88,
+          });
+    if (result.canceled || !result.assets[0]?.uri) return;
+    const relativePath = await persistCompletionPhoto(
+      currentOrder.id,
+      result.assets[0].uri,
+    );
+    await updateSelectedOrder(
+      appendProofPhoto(currentOrder, relativePath, new Date().toISOString()),
+    );
+  };
+
+  const callSelectedRecipient = async () => {
+    if (!selectedDelivery?.recipientTel) return;
+    await Linking.openURL(`tel:${selectedDelivery.recipientTel}`);
+    const log: ContactLog = {
+      id: `contact-${Date.now()}`,
+      deliveryId: selectedDelivery.id,
+      channel: 'recipient',
+      label: 'recipient',
+      phone: selectedDelivery.recipientTel,
+      at: new Date().toISOString(),
+    };
+    setContactLogs((current) => [log, ...current]);
+    await contactLogRepository.save(log);
+  };
+
+  const writeTextFile = async (name: string, text: string) => {
+    const uri = `${FileSystem.documentDirectory}${name}`;
+    await FileSystem.writeAsStringAsync(uri, text);
+    Alert.alert('저장 완료', uri);
+  };
+
+  const exportCsv = async () => {
+    const daily = summarizeDailyProfit(orders, fuelLogs, settings);
+    await writeTextFile('routelo-profit.csv', buildDailyProfitCsv(daily));
+  };
+
+  const exportBackup = async () => {
+    await writeTextFile(
+      'routelo-backup.json',
+      buildBackupJson({
+        exportedAt: new Date().toISOString(),
+        orders,
+        fuelLogs,
+        mileageLogs,
+        contactLogs,
+        settings,
+      }),
+    );
+  };
+
+  const restoreBackup = async () => {
+    const uri = `${FileSystem.documentDirectory}routelo-backup.json`;
+    try {
+      const text = await FileSystem.readAsStringAsync(uri);
+      const parsed = parseBackup(text);
+      if (!parsed.ok) {
+        Alert.alert('복원 실패', parsed.error);
+        return;
+      }
+      setOrders(parsed.backup.orders);
+      setFuelLogs(parsed.backup.fuelLogs);
+      setMileageLogs(parsed.backup.mileageLogs);
+      setContactLogs(parsed.backup.contactLogs);
+      setSettings(parsed.backup.settings);
+      await deliveryRepository.saveAll(parsed.backup.orders);
+      await fuelLogRepository.saveAll(parsed.backup.fuelLogs);
+      await mileageLogRepository.saveAll(parsed.backup.mileageLogs);
+      await contactLogRepository.saveAll(parsed.backup.contactLogs);
+      await settingsRepository.save(parsed.backup.settings);
+      Alert.alert('복원 완료', 'Routelo 백업 데이터를 복원했습니다.');
+    } catch (error) {
+      Alert.alert('복원 파일 없음', `${uri} 파일을 찾을 수 없습니다.`);
+    }
+  };
+
   const screen = useMemo(() => {
     if (activeTab === 'deliveries') {
       return (
@@ -2965,9 +3317,15 @@ export default function RouteloApp() {
         <CalendarScreen
           orders={orders}
           fuelLogs={fuelLogs}
+          mileageLogs={mileageLogs}
           settings={settings}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
+          onAddFuelLog={addFuelLog}
+          onAddMileageLog={addMileageLog}
+          onExportCsv={exportCsv}
+          onExportBackup={exportBackup}
+          onRestoreBackup={restoreBackup}
         />
       );
     }
@@ -3001,7 +3359,7 @@ export default function RouteloApp() {
         onNotifications={openNotifications}
       />
     );
-  }, [account, activeTab, deliveries, fuelLogs, orders, settings]);
+  }, [account, activeTab, deliveries, fuelLogs, mileageLogs, orders, settings]);
 
   const darkMode = settings.appearance.themeMode === 'dark';
   const C = darkMode ? DARK : LIGHT;
@@ -3070,11 +3428,14 @@ export default function RouteloApp() {
       </View>
       <DeliveryDetailSheet
         delivery={selectedDelivery}
+        order={orders.find((item) => item.id === selectedDelivery?.id)}
         visible={Boolean(selectedDelivery)}
         onClose={() => setSelectedDelivery(undefined)}
         onToggle={toggleSelected}
         onFail={markSelectedFailed}
         onRevisit={markSelectedRevisit}
+        onAttachPhoto={attachSelectedPhoto}
+        onCallRecipient={callSelectedRecipient}
       />
       <OcrScannerModal
         visible={scannerVisible}
@@ -3317,6 +3678,59 @@ const makeStyles = (C: Palette) =>
   profitSummaryValueNegative: { color: C.danger },
   profitSummaryMeta: { justifyContent: 'center', alignItems: 'flex-end', gap: 4 },
   profitSummaryMetaText: { color: C.textMuted, fontSize: 11, fontWeight: '700' },
+  financeActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  financeInputCard: {
+    backgroundColor: C.surfaceRaised,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: C.outline,
+    padding: 15,
+    marginBottom: 12,
+    gap: 10,
+  },
+  financeInputGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  financeInput: {
+    flexGrow: 1,
+    minWidth: 104,
+    minHeight: 46,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.surface,
+    color: C.text,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  financeHint: {
+    color: C.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  financeMetricRow: {
+    minHeight: 44,
+    borderRadius: 16,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.outline,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  financeMetricVehicle: {
+    color: C.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
   calendarEmpty: {
     backgroundColor: C.surface,
     borderRadius: 22,
@@ -3373,6 +3787,15 @@ const makeStyles = (C: Palette) =>
   calendarEventText: { color: C.warning, fontSize: 12, fontWeight: '800' },
   calendarConflictText: { color: C.warning, fontSize: 12, fontWeight: '900' },
   calendarLateText: { color: C.danger, fontSize: 12, fontWeight: '900' },
+  proofPhotoRow: { flexDirection: 'row', gap: 10, paddingVertical: 4 },
+  proofPhotoThumb: {
+    width: 76,
+    height: 76,
+    borderRadius: 18,
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1,
+    borderColor: C.outline,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',

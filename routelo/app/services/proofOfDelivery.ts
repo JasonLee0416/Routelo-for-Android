@@ -123,3 +123,33 @@ export function clearProofOfDelivery(
     updatedAt: now,
   };
 }
+
+export function appendProofPhoto(
+  order: DeliveryOrder,
+  photoUri: string,
+  now = new Date().toISOString(),
+): DeliveryOrder {
+  const proof = order.proofOfDelivery || {
+    status: 'completed' as const,
+    recordedAt: now,
+    completedAt: now,
+    photoUris: [],
+    note: 'Completion proof photo attached.',
+  };
+  return {
+    ...order,
+    status: proof.status === 'completed' ? 'completed' : order.status,
+    schedule: {
+      ...order.schedule,
+      completedAt:
+        proof.status === 'completed'
+          ? order.schedule.completedAt || now
+          : order.schedule.completedAt,
+    },
+    proofOfDelivery: {
+      ...proof,
+      photoUris: [...proof.photoUris, photoUri],
+    },
+    updatedAt: now,
+  };
+}

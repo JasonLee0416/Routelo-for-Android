@@ -11,15 +11,22 @@ import {
 } from '../domain';
 import {
   DeliveryRepository,
+  ContactLogRepository,
+  FuelLogRepository,
   KeyValueStore,
+  MileageLogRepository,
   ReceiptRepository,
   RoutePlanRepository,
 } from './contracts';
+import { ContactLog, FuelLog, MileageLog } from '../models';
 
 export const LEGACY_DELIVERY_KEY = '@routelo/md3-state/v1';
 const DELIVERY_KEY = '@routelo/delivery-orders/v1';
 const RECEIPT_KEY = '@routelo/receipt-documents/v1';
 const ROUTE_KEY = '@routelo/route-plans/v1';
+const FUEL_KEY = '@routelo/fuel-logs/v1';
+const MILEAGE_KEY = '@routelo/mileage-logs/v1';
+const CONTACT_KEY = '@routelo/contact-logs/v1';
 const MIGRATION_KEY = '@routelo/migrations/legacy-deliveries-v1';
 
 const SAMPLE_IDS = new Set([
@@ -226,5 +233,59 @@ export class LocalRoutePlanRepository implements RoutePlanRepository {
         (plan) => plan.serviceDate !== serviceDate,
       ),
     );
+  }
+}
+
+class LocalCollectionRepository<T extends { id: string }> {
+  constructor(
+    private readonly store: KeyValueStore,
+    private readonly key: string,
+  ) {}
+
+  list() {
+    return readCollection<T>(this.store, this.key);
+  }
+
+  async save(record: T) {
+    const records = await this.list();
+    const index = records.findIndex((item) => item.id === record.id);
+    if (index >= 0) records[index] = record;
+    else records.push(record);
+    await this.saveAll(records);
+  }
+
+  saveAll(records: T[]) {
+    return writeCollection(this.store, this.key, records);
+  }
+
+  async remove(id: string) {
+    await this.saveAll((await this.list()).filter((record) => record.id !== id));
+  }
+}
+
+export class LocalFuelLogRepository
+  extends LocalCollectionRepository<FuelLog>
+  implements FuelLogRepository
+{
+  constructor(store: KeyValueStore) {
+    super(store, FUEL_KEY);
+  }
+}
+
+export class LocalMileageLogRepository
+  extends LocalCollectionRepository<MileageLog>
+  implements MileageLogRepository
+{
+  constructor(store: KeyValueStore) {
+    super(store, MILEAGE_KEY);
+  }
+}
+
+export class LocalContactLogRepository
+  extends LocalCollectionRepository<ContactLog>
+  implements ContactLogRepository
+{
+  constructor(store: KeyValueStore) {
+    super(store, CONTACT_KEY);
   }
 }

@@ -139,6 +139,21 @@ export function mergeOcrResult(
     processingMs: current.processingMs + incoming.processingMs,
     variantsCompared: current.variantsCompared + incoming.variantsCompared,
     unmapped: [...current.unmapped, ...incoming.unmapped],
+    conflicts: [...(current.conflicts ?? []), ...(incoming.conflicts ?? [])],
+    cloudFallback: {
+      trigger:
+        Boolean(current.cloudFallback?.trigger) ||
+        Boolean(incoming.cloudFallback?.trigger),
+      reasons: [
+        ...(current.cloudFallback?.reasons ?? []),
+        ...(incoming.cloudFallback?.reasons ?? []),
+      ],
+    },
+    eventType:
+      (incoming.eventType?.confidence ?? 0) >=
+      (current.eventType?.confidence ?? 0)
+        ? incoming.eventType
+        : current.eventType,
     recognizedLines: [
       ...(current.recognizedLines ?? []),
       ...(incoming.recognizedLines ?? []),
