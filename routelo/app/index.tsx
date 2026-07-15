@@ -9,6 +9,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Linking,
+  LayoutAnimation,
   Modal,
   Platform,
   Pressable,
@@ -17,6 +18,7 @@ import {
   Switch,
   Text,
   TextInput,
+  UIManager,
   View,
 } from 'react-native';
 import {
@@ -75,7 +77,7 @@ import { summarizeEfficiencyByVehicle } from './services/efficiency';
 import { buildDailyProfitCsv } from './services/export';
 import { createFuelLog } from './services/fuel';
 import { createMileageLog } from './services/mileage';
-import { buildPlannedNotifications } from './services/notificationPlan';
+import { buildPlannedNotifications, PlannedNotification } from './services/notificationPlan';
 import { syncScheduledNotifications } from './services/notifications';
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
@@ -202,6 +204,13 @@ const DARK: Palette = {
 };
 
 const C = LIGHT;
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const animateLayout = () =>
+  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
 type AppStyles = ReturnType<typeof makeStyles>;
 type ThemeValue = { C: Palette; styles: AppStyles };
@@ -551,11 +560,13 @@ function CompactDelivery({
 
 function HomeScreen({
   deliveries,
+  notificationCount,
   onDeliveryPress,
   onSeeAll,
   onNotifications,
 }: {
   deliveries: Delivery[];
+  notificationCount: number;
   onDeliveryPress: (delivery: Delivery) => void;
   onSeeAll: () => void;
   onNotifications: () => void;
@@ -574,7 +585,7 @@ function HomeScreen({
         eyebrow="ROUTELO · 오늘의 운영"
         title="안녕하세요, 기사님"
         subtitle="마감 시간과 우선 배송을 먼저 확인하세요."
-        notificationCount={3}
+        notificationCount={notificationCount}
         onNotificationPress={onNotifications}
       />
 
@@ -696,10 +707,12 @@ function DeliveryCard({
 
 function DeliveryListScreen({
   deliveries,
+  notificationCount,
   onDeliveryPress,
   onNotifications,
 }: {
   deliveries: Delivery[];
+  notificationCount: number;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
 }) {
@@ -714,7 +727,7 @@ function DeliveryListScreen({
         eyebrow="TODAY · DELIVERY"
         title="오늘의 배달"
         subtitle={`${deliveries.length}건의 배달 일정을 관리합니다.`}
-        notificationCount={3}
+        notificationCount={notificationCount}
         onNotificationPress={onNotifications}
       />
       <View style={styles.filterSegment}>
@@ -726,7 +739,10 @@ function DeliveryListScreen({
           <Pressable
             key={key}
             style={[styles.filterItem, filter === key && styles.filterItemSelected]}
-            onPress={() => setFilter(key)}
+            onPress={() => {
+              animateLayout();
+              setFilter(key);
+            }}
           >
             <Text style={[styles.filterText, filter === key && styles.filterTextSelected]}>
               {label}
@@ -749,12 +765,14 @@ function DeliveryListScreen({
 
 function RouteScreen({
   deliveries,
+  notificationCount,
   navApp,
   allowReorder,
   onDeliveryPress,
   onNotifications,
 }: {
   deliveries: Delivery[];
+  notificationCount: number;
   navApp: NavApp;
   allowReorder: boolean;
   onDeliveryPress: (delivery: Delivery) => void;
@@ -777,6 +795,7 @@ function RouteScreen({
   const totalDistance = order.reduce((sum, item) => sum + item.distanceKm, 0);
 
   const move = (index: number, direction: -1 | 1) => {
+    animateLayout();
     setOrder((current) => {
       const target = index + direction;
       if (target < 0 || target >= current.length) return current;
@@ -801,7 +820,7 @@ function RouteScreen({
         eyebrow="ROUTE · STACK"
         title="배달 동선"
         subtitle="배달 순서를 직접 정하고, 맨 위 목적지로 바로 안내받으세요."
-        notificationCount={3}
+        notificationCount={notificationCount}
         onNotificationPress={onNotifications}
       />
       {!!next && (
@@ -930,6 +949,7 @@ function CalendarScreen({
   fuelLogs,
   mileageLogs,
   settings,
+  notificationCount,
   onDeliveryPress,
   onNotifications,
   onAddFuelLog,
@@ -942,6 +962,7 @@ function CalendarScreen({
   fuelLogs: FuelLog[];
   mileageLogs: MileageLog[];
   settings: RouteloSettings;
+  notificationCount: number;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
   onAddFuelLog: (log: FuelLog) => void;
@@ -957,6 +978,9 @@ function CalendarScreen({
   const [cursor, setCursor] = useState(
     new Date(today.getFullYear(), today.getMonth(), today.getDate()),
   );
+  const [financeExpanded, setFinanceExpanded] = useState(false);
+  const [dataExpanded, setDataExpanded] = useState(false);
+  const [agendaExpanded, setAgendaExpanded] = useState(false);
   const items = useMemo(
     () =>
       orders
@@ -1083,10 +1107,10 @@ function CalendarScreen({
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.screenContent}>
       <ScreenHeader
-        eyebrow="DELIVERY CALENDAR"
-        title="배달 일정"
-        subtitle="마감·예식·동선 시간을 분리해 확인합니다"
-        notificationCount={3}
+        eyebrow="PROFIT CALENDAR"
+        title="손익 캘린더"
+        subtitle="날짜별 총 수익과 유류비 차감을 먼저 확인합니다."
+        notificationCount={notificationCount}
         onNotificationPress={onNotifications}
       />
       <View style={styles.calendarModeRow}>
@@ -1196,10 +1220,7 @@ function CalendarScreen({
           })}
         </View>
       </View>
-      <SectionHeader
-        title={`${selectedDate} 일정`}
-        caption={`${selectedItems.length}건`}
-      />
+      <SectionHeader title={`${selectedDate} 손익`} caption="배송 수수료 - 유류비" />
       <View style={styles.profitSummaryCard}>
         <View>
           <Text style={styles.profitSummaryLabel}>당일 순수익</Text>
@@ -1221,96 +1242,155 @@ function CalendarScreen({
           </Text>
         </View>
       </View>
-      <View style={styles.financeActionRow}>
-        <Pressable style={styles.secondaryButton} onPress={onExportCsv}>
-          <Ionicons name="download-outline" size={18} color={C.primary} />
-          <Text style={styles.secondaryButtonText}>CSV 내보내기</Text>
-        </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={onExportBackup}>
-          <Ionicons name="archive-outline" size={18} color={C.primary} />
-          <Text style={styles.secondaryButtonText}>백업 저장</Text>
-        </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={onRestoreBackup}>
-          <Ionicons name="cloud-upload-outline" size={18} color={C.primary} />
-          <Text style={styles.secondaryButtonText}>백업 복원</Text>
-        </Pressable>
-      </View>
-      <View style={styles.financeInputCard}>
-        <Text style={styles.sheetInfoLabel}>선택 날짜 주유 기록</Text>
-        <View style={styles.financeInputGrid}>
-          <TextInput
-            style={styles.financeInput}
-            value={fuelLiters}
-            onChangeText={setFuelLiters}
-            keyboardType="decimal-pad"
-            placeholder="주유량 L"
-            placeholderTextColor="#6B7280"
-          />
-          <TextInput
-            style={styles.financeInput}
-            value={fuelAmount}
-            onChangeText={setFuelAmount}
-            keyboardType="number-pad"
-            placeholder="주유금액 원"
-            placeholderTextColor="#6B7280"
-          />
-          <TextInput
-            style={styles.financeInput}
-            value={fuelOdometer}
-            onChangeText={setFuelOdometer}
-            keyboardType="decimal-pad"
-            placeholder="계기판 km"
-            placeholderTextColor="#6B7280"
-          />
+      <Pressable
+        style={styles.sectionToggle}
+        onPress={() => {
+          animateLayout();
+          setFinanceExpanded((value) => !value);
+        }}
+      >
+        <View>
+          <Text style={styles.sectionToggleTitle}>주유·주행거리 입력</Text>
+          <Text style={styles.sectionToggleCaption}>
+            {selectedFuelLogs.length}건 주유 · {selectedMileageLogs.length}건 주행 기록
+          </Text>
         </View>
-        <Pressable style={styles.scanPrimaryButton} onPress={submitFuelLog}>
-          <Text style={styles.scanPrimaryButtonText}>주유 기록 추가</Text>
-        </Pressable>
-        <Text style={styles.financeHint}>
-          {selectedFuelLogs.length}건 기록 · {formatWon(selectedFuelLogs.reduce((sum, log) => sum + log.amount, 0))}
-        </Text>
-      </View>
-      <View style={styles.financeInputCard}>
-        <Text style={styles.sheetInfoLabel}>선택 날짜 주행거리 기록</Text>
-        <View style={styles.financeInputGrid}>
-          <TextInput
-            style={styles.financeInput}
-            value={mileageOdometer}
-            onChangeText={setMileageOdometer}
-            keyboardType="decimal-pad"
-            placeholder="현재 계기판 km"
-            placeholderTextColor="#6B7280"
-          />
-          <TextInput
-            style={styles.financeInput}
-            value={dailyDistance}
-            onChangeText={setDailyDistance}
-            keyboardType="decimal-pad"
-            placeholder="당일 주행 km"
-            placeholderTextColor="#6B7280"
-          />
-        </View>
-        <Pressable style={styles.scanPrimaryButton} onPress={submitMileageLog}>
-          <Text style={styles.scanPrimaryButtonText}>주행거리 기록 추가</Text>
-        </Pressable>
-        <Text style={styles.financeHint}>
-          {selectedMileageLogs.length}건 기록 · {selectedMileageLogs.reduce((sum, log) => sum + log.dailyDistanceKm, 0).toLocaleString('ko-KR')}km
-        </Text>
-      </View>
-      {vehicleEfficiency.length > 0 && (
-        <View style={styles.financeInputCard}>
-          <Text style={styles.sheetInfoLabel}>차량별 실측 연비/비용</Text>
-          {vehicleEfficiency.map((item) => (
-            <View key={item.vehicle} style={styles.financeMetricRow}>
-              <Text style={styles.financeMetricVehicle}>{item.vehicle}</Text>
-              <Text style={styles.financeHint}>
-                {item.summary.kmPerLiter ?? '-'}km/L · {item.summary.costPerKm ? formatWon(item.summary.costPerKm) : '-'} / km
-              </Text>
+        <Ionicons
+          name={financeExpanded ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={C.primary}
+        />
+      </Pressable>
+      {financeExpanded && (
+        <>
+          <View style={styles.financeInputCard}>
+            <Text style={styles.sheetInfoLabel}>선택 날짜 주유 기록</Text>
+            <View style={styles.financeInputGrid}>
+              <TextInput
+                style={styles.financeInput}
+                value={fuelLiters}
+                onChangeText={setFuelLiters}
+                keyboardType="decimal-pad"
+                placeholder="주유량 L"
+                placeholderTextColor={C.textMuted}
+              />
+              <TextInput
+                style={styles.financeInput}
+                value={fuelAmount}
+                onChangeText={setFuelAmount}
+                keyboardType="number-pad"
+                placeholder="주유금액 원"
+                placeholderTextColor={C.textMuted}
+              />
+              <TextInput
+                style={styles.financeInput}
+                value={fuelOdometer}
+                onChangeText={setFuelOdometer}
+                keyboardType="decimal-pad"
+                placeholder="계기판 km"
+                placeholderTextColor={C.textMuted}
+              />
             </View>
-          ))}
+            <Pressable style={styles.scanPrimaryButton} onPress={submitFuelLog}>
+              <Text style={styles.scanPrimaryButtonText}>주유 기록 추가</Text>
+            </Pressable>
+            <Text style={styles.financeHint}>
+              {selectedFuelLogs.length}건 기록 · {formatWon(selectedFuelLogs.reduce((sum, log) => sum + log.amount, 0))}
+            </Text>
+          </View>
+          <View style={styles.financeInputCard}>
+            <Text style={styles.sheetInfoLabel}>선택 날짜 주행거리 기록</Text>
+            <View style={styles.financeInputGrid}>
+              <TextInput
+                style={styles.financeInput}
+                value={mileageOdometer}
+                onChangeText={setMileageOdometer}
+                keyboardType="decimal-pad"
+                placeholder="현재 계기판 km"
+                placeholderTextColor={C.textMuted}
+              />
+              <TextInput
+                style={styles.financeInput}
+                value={dailyDistance}
+                onChangeText={setDailyDistance}
+                keyboardType="decimal-pad"
+                placeholder="당일 주행 km"
+                placeholderTextColor={C.textMuted}
+              />
+            </View>
+            <Pressable style={styles.scanPrimaryButton} onPress={submitMileageLog}>
+              <Text style={styles.scanPrimaryButtonText}>주행거리 기록 추가</Text>
+            </Pressable>
+            <Text style={styles.financeHint}>
+              {selectedMileageLogs.length}건 기록 · {selectedMileageLogs.reduce((sum, log) => sum + log.dailyDistanceKm, 0).toLocaleString('ko-KR')}km
+            </Text>
+          </View>
+          {vehicleEfficiency.length > 0 && (
+            <View style={styles.financeInputCard}>
+              <Text style={styles.sheetInfoLabel}>차량별 실측 연비/비용</Text>
+              {vehicleEfficiency.map((item) => (
+                <View key={item.vehicle} style={styles.financeMetricRow}>
+                  <Text style={styles.financeMetricVehicle}>{item.vehicle}</Text>
+                  <Text style={styles.financeHint}>
+                    {item.summary.kmPerLiter ?? '-'}km/L · {item.summary.costPerKm ? formatWon(item.summary.costPerKm) : '-'} / km
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </>
+      )}
+      <Pressable
+        style={styles.sectionToggle}
+        onPress={() => {
+          animateLayout();
+          setDataExpanded((value) => !value);
+        }}
+      >
+        <View>
+          <Text style={styles.sectionToggleTitle}>데이터 내보내기·복원</Text>
+          <Text style={styles.sectionToggleCaption}>CSV, 백업 저장, 백업 복원</Text>
+        </View>
+        <Ionicons
+          name={dataExpanded ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={C.primary}
+        />
+      </Pressable>
+      {dataExpanded && (
+        <View style={styles.financeActionRow}>
+          <Pressable style={styles.secondaryButton} onPress={onExportCsv}>
+            <Ionicons name="download-outline" size={18} color={C.primary} />
+            <Text style={styles.secondaryButtonText}>CSV 내보내기</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={onExportBackup}>
+            <Ionicons name="archive-outline" size={18} color={C.primary} />
+            <Text style={styles.secondaryButtonText}>백업 저장</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={onRestoreBackup}>
+            <Ionicons name="cloud-upload-outline" size={18} color={C.primary} />
+            <Text style={styles.secondaryButtonText}>백업 복원</Text>
+          </Pressable>
         </View>
       )}
-      {selectedItems.length === 0 ? (
+      <Pressable
+        style={styles.sectionToggle}
+        onPress={() => {
+          animateLayout();
+          setAgendaExpanded((value) => !value);
+        }}
+      >
+        <View>
+          <Text style={styles.sectionToggleTitle}>배송 일정 상세</Text>
+          <Text style={styles.sectionToggleCaption}>{selectedItems.length}건 · 필요할 때만 확인</Text>
+        </View>
+        <Ionicons
+          name={agendaExpanded ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={C.primary}
+        />
+      </Pressable>
+      {agendaExpanded && selectedItems.length === 0 ? (
         <View style={styles.calendarEmpty}>
           <Ionicons name="calendar-clear-outline" size={30} color={C.textMuted} />
           <Text style={styles.calendarEmptyTitle}>등록된 배달이 없습니다</Text>
@@ -1318,7 +1398,7 @@ function CalendarScreen({
             날짜만 인식된 OCR 일정도 이곳에 안전하게 표시됩니다.
           </Text>
         </View>
-      ) : (
+      ) : agendaExpanded ? (
         selectedItems.map((item) => {
           const risk = calendarRisks.get(item.id);
           const order = orders.find(
@@ -1385,7 +1465,7 @@ function CalendarScreen({
             </Pressable>
           );
         })
-      )}
+      ) : null}
     </ScrollView>
   );
 }
@@ -1428,59 +1508,70 @@ function NotificationCard({
   );
 }
 
-function NotificationsScreen() {
+const formatNotificationTime = (fireAtMs: number) =>
+  new Date(fireAtMs).toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+function NotificationsScreen({
+  plannedNotifications,
+  notificationCount,
+}: {
+  plannedNotifications: PlannedNotification[];
+  notificationCount: number;
+}) {
   const { C, styles } = useTheme();
+  const strictCount = plannedNotifications.filter(
+    (item) => item.kind === 'strictDeadline',
+  ).length;
+  const eventCount = plannedNotifications.filter(
+    (item) => item.kind === 'eventTime',
+  ).length;
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <ScreenHeader
         eyebrow="ALERT CENTER"
         title="알림"
-        subtitle="긴급도가 높은 알림부터 표시합니다."
+        subtitle="예식·엄수 마감 알림을 시간순으로 표시합니다."
+        notificationCount={notificationCount}
       />
       <View style={styles.notificationSummary}>
         <View>
-          <Text style={styles.notificationSummaryLabel}>확인 필요한 알림</Text>
-          <Text style={styles.notificationSummaryValue}>3건</Text>
+          <Text style={styles.notificationSummaryLabel}>예약된 운영 알림</Text>
+          <Text style={styles.notificationSummaryValue}>{notificationCount}건</Text>
         </View>
         <View style={styles.urgencyLegend}>
           <View style={[styles.legendDot, { backgroundColor: C.danger }]} />
-          <Text style={styles.legendText}>긴급 1</Text>
+          <Text style={styles.legendText}>예식 {eventCount}</Text>
           <View style={[styles.legendDot, { backgroundColor: C.warning }]} />
-          <Text style={styles.legendText}>주의 1</Text>
+          <Text style={styles.legendText}>엄수 {strictCount}</Text>
         </View>
       </View>
-      <SectionHeader title="오늘" />
-      <View style={styles.notificationList}>
-        <NotificationCard
-          tone="danger"
-          icon="calendar-outline"
-          title="예식 시간 30분 전"
-          body="축하 3단 화환 설치를 11:00 이전에 완료해야 합니다."
-          time="10:30"
-        />
-        <NotificationCard
-          tone="warning"
-          icon="speedometer-outline"
-          title="도착 지연 위험"
-          body="송파구 목적지의 예상 도착 시간이 엄수 마감과 12분 차이입니다."
-          time="10:18"
-        />
-        <NotificationCard
-          tone="info"
-          icon="swap-horizontal-outline"
-          title="추천 동선이 변경되었습니다"
-          body="교통 상황을 반영해 서초구 방문 순서가 2번으로 조정되었습니다."
-          time="09:52"
-        />
-      </View>
-      <SectionHeader title="이전 알림" />
-      <NotificationCard
-        tone="info"
-        icon="checkmark-done-outline"
-        title="첫 번째 배송 완료"
-        body="강남구 학동로 배송이 정상적으로 완료되었습니다."
-        time="09:14"
-      />
+      <SectionHeader title="다가오는 알림" />
+      {plannedNotifications.length === 0 ? (
+        <View style={styles.calendarEmpty}>
+          <Ionicons name="notifications-off-outline" size={30} color={C.textMuted} />
+          <Text style={styles.calendarEmptyTitle}>예약된 알림이 없습니다</Text>
+          <Text style={styles.calendarEmptyText}>
+            예식 시간이나 엄수 마감이 있는 배송이 등록되면 이곳에 표시됩니다.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.notificationList}>
+          {plannedNotifications.slice(0, 12).map((item) => (
+            <NotificationCard
+              key={item.id}
+              tone={item.kind === 'eventTime' ? 'danger' : 'warning'}
+              icon={item.kind === 'eventTime' ? 'calendar-outline' : 'alarm-outline'}
+              title={item.title}
+              body={item.body}
+              time={formatNotificationTime(item.fireAtMs)}
+            />
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -2166,11 +2257,15 @@ function DeliveryDetailSheet({
     null,
   );
   const [reasonText, setReasonText] = useState('');
+  const [proofExpanded, setProofExpanded] = useState(false);
+  const [issueExpanded, setIssueExpanded] = useState(false);
   // 시트가 닫히거나 다른 배송으로 바뀌면 입력 상태를 리셋한다(사유가 엉뚱한
   // 배송에 남지 않도록 delivery.id에도 의존).
   useEffect(() => {
     setReasonMode(null);
     setReasonText('');
+    setProofExpanded(false);
+    setIssueExpanded(false);
   }, [visible, delivery?.id]);
   const submitReason = () => {
     if (!hasProofReason(reasonText)) return;
@@ -2221,44 +2316,6 @@ function DeliveryDetailSheet({
             <Text style={styles.sheetInfoLabel}>요청사항</Text>
             <Text style={styles.sheetInfoText}>{delivery.customerRequests}</Text>
           </View>
-          <View style={styles.sheetInfoBlock}>
-            <Text style={styles.sheetInfoLabel}>배송 증거 사진</Text>
-            {(order?.proofOfDelivery?.photoUris.length || 0) > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.proofPhotoRow}>
-                  {order?.proofOfDelivery?.photoUris.map((uri) => (
-                    <Image
-                      key={uri}
-                      source={{
-                        uri: uri.startsWith('file:') ? uri : completionPhotoUri(uri),
-                      }}
-                      style={styles.proofPhotoThumb}
-                    />
-                  ))}
-                </View>
-              </ScrollView>
-            ) : (
-              <Text style={styles.sheetInfoText}>
-                아직 첨부된 완료/실패 증거 사진이 없습니다.
-              </Text>
-            )}
-            <View style={[styles.sheetActions, { marginTop: 12 }]}>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => onAttachPhoto('camera')}
-              >
-                <Ionicons name="camera-outline" size={18} color={C.primary} />
-                <Text style={styles.secondaryButtonText}>촬영</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => onAttachPhoto('library')}
-              >
-                <Ionicons name="image-outline" size={18} color={C.primary} />
-                <Text style={styles.secondaryButtonText}>갤러리</Text>
-              </Pressable>
-            </View>
-          </View>
           <View style={styles.sheetActions}>
             <Pressable
               style={styles.secondaryButton}
@@ -2278,67 +2335,146 @@ function DeliveryDetailSheet({
               </Text>
             </Pressable>
           </View>
-          <View style={styles.sheetActions}>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => setReasonMode('failed')}
-            >
-              <Ionicons name="close-circle-outline" size={18} color={C.danger} />
-              <Text style={[styles.secondaryButtonText, { color: C.danger }]}>
-                배송 실패
+          <Pressable
+            style={styles.sheetToggleRow}
+            onPress={() => {
+              animateLayout();
+              setProofExpanded((value) => !value);
+            }}
+          >
+            <View>
+              <Text style={styles.sheetToggleTitle}>배송 증거 사진</Text>
+              <Text style={styles.sheetToggleCaption}>
+                {order?.proofOfDelivery?.photoUris.length || 0}장 첨부됨
               </Text>
-            </Pressable>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => setReasonMode('revisit')}
-            >
-              <Ionicons name="return-up-forward-outline" size={18} color={C.warning} />
-              <Text style={[styles.secondaryButtonText, { color: C.warning }]}>
-                재방문 필요
-              </Text>
-            </Pressable>
-          </View>
-          {reasonMode && (
+            </View>
+            <Ionicons
+              name={proofExpanded ? 'chevron-up' : 'chevron-down'}
+              size={19}
+              color={C.primary}
+            />
+          </Pressable>
+          {proofExpanded && (
             <View style={styles.sheetInfoBlock}>
-              <Text style={styles.sheetInfoLabel}>
-                {reasonMode === 'failed' ? '실패 사유' : '재방문 사유'}
-              </Text>
-              <TextInput
-                style={[styles.onboardingInput, { minHeight: 72 }]}
-                value={reasonText}
-                onChangeText={setReasonText}
-                multiline
-                autoFocus
-                placeholder={
-                  reasonMode === 'failed'
-                    ? '예: 수령인 부재, 주소 오류'
-                    : '예: 오후 재방문 요청'
-                }
-                placeholderTextColor="#6B7280"
-              />
+              {(order?.proofOfDelivery?.photoUris.length || 0) > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.proofPhotoRow}>
+                    {order?.proofOfDelivery?.photoUris.map((uri) => (
+                      <Image
+                        key={uri}
+                        source={{
+                          uri: uri.startsWith('file:') ? uri : completionPhotoUri(uri),
+                        }}
+                        style={styles.proofPhotoThumb}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              ) : (
+                <Text style={styles.sheetInfoText}>
+                  아직 첨부된 완료/실패 증거 사진이 없습니다.
+                </Text>
+              )}
               <View style={[styles.sheetActions, { marginTop: 12 }]}>
                 <Pressable
                   style={styles.secondaryButton}
-                  onPress={() => {
-                    setReasonMode(null);
-                    setReasonText('');
-                  }}
+                  onPress={() => onAttachPhoto('camera')}
                 >
-                  <Text style={styles.secondaryButtonText}>취소</Text>
+                  <Ionicons name="camera-outline" size={18} color={C.primary} />
+                  <Text style={styles.secondaryButtonText}>촬영</Text>
                 </Pressable>
                 <Pressable
-                  style={[
-                    styles.primaryButton,
-                    !hasProofReason(reasonText) && { opacity: 0.5 },
-                  ]}
-                  disabled={!hasProofReason(reasonText)}
-                  onPress={submitReason}
+                  style={styles.secondaryButton}
+                  onPress={() => onAttachPhoto('library')}
                 >
-                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                  <Text style={styles.primaryButtonText}>기록</Text>
+                  <Ionicons name="image-outline" size={18} color={C.primary} />
+                  <Text style={styles.secondaryButtonText}>갤러리</Text>
                 </Pressable>
               </View>
             </View>
+          )}
+          <Pressable
+            style={styles.sheetToggleRow}
+            onPress={() => {
+              animateLayout();
+              setIssueExpanded((value) => !value);
+            }}
+          >
+            <View>
+              <Text style={styles.sheetToggleTitle}>배송 문제 기록</Text>
+              <Text style={styles.sheetToggleCaption}>실패·재방문 사유가 있을 때만 입력</Text>
+            </View>
+            <Ionicons
+              name={issueExpanded ? 'chevron-up' : 'chevron-down'}
+              size={19}
+              color={C.primary}
+            />
+          </Pressable>
+          {issueExpanded && (
+            <>
+              <View style={styles.sheetActions}>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => setReasonMode('failed')}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color={C.danger} />
+                  <Text style={[styles.secondaryButtonText, { color: C.danger }]}>
+                    배송 실패
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => setReasonMode('revisit')}
+                >
+                  <Ionicons name="return-up-forward-outline" size={18} color={C.warning} />
+                  <Text style={[styles.secondaryButtonText, { color: C.warning }]}>
+                    재방문 필요
+                  </Text>
+                </Pressable>
+              </View>
+              {reasonMode && (
+                <View style={styles.sheetInfoBlock}>
+                  <Text style={styles.sheetInfoLabel}>
+                    {reasonMode === 'failed' ? '실패 사유' : '재방문 사유'}
+                  </Text>
+                  <TextInput
+                    style={[styles.onboardingInput, { minHeight: 72 }]}
+                    value={reasonText}
+                    onChangeText={setReasonText}
+                    multiline
+                    autoFocus
+                    placeholder={
+                      reasonMode === 'failed'
+                        ? '예: 수령인 부재, 주소 오류'
+                        : '예: 오후 재방문 요청'
+                    }
+                    placeholderTextColor={C.textMuted}
+                  />
+                  <View style={[styles.sheetActions, { marginTop: 12 }]}>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => {
+                        setReasonMode(null);
+                        setReasonText('');
+                      }}
+                    >
+                      <Text style={styles.secondaryButtonText}>취소</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.primaryButton,
+                        !hasProofReason(reasonText) && { opacity: 0.5 },
+                      ]}
+                      disabled={!hasProofReason(reasonText)}
+                      onPress={submitReason}
+                    >
+                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                      <Text style={styles.primaryButtonText}>기록</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </>
           )}
         </View>
       </View>
@@ -2589,6 +2725,11 @@ function OcrScannerModal({
     setLiveSession(createInitialLiveOcrSession());
   };
 
+  const setStageAnimated = (next: ScanStage) => {
+    animateLayout();
+    setStage(next);
+  };
+
   useEffect(() => {
     if (!visible) reset();
   }, [visible]);
@@ -2634,7 +2775,7 @@ function OcrScannerModal({
       variantsCompared: 0,
       unmapped: [],
     });
-    setStage('quality');
+    setStageAnimated('quality');
   };
 
   const verifyForReview = (reviewFields: OcrFieldResult[]) => {
@@ -2655,7 +2796,7 @@ function OcrScannerModal({
       Alert.alert('재촬영 권장', result.quality.messages[0] || '촬영 품질을 확인해주세요.');
       return;
     }
-    setStage('processing');
+    setStageAnimated('processing');
     setVendorCheck(undefined);
     try {
       const next = await runReceiptOcr({ ...assetInfo, uri: imageUri });
@@ -2666,10 +2807,10 @@ function OcrScannerModal({
       setResult(merged);
       setFields(merged.fields);
       if (nextSession.readyForReview) {
-        setStage('review');
+        setStageAnimated('review');
         verifyForReview(merged.fields);
       } else {
-        setStage('capture');
+        setStageAnimated('capture');
         Alert.alert(
           '프레임 누적 완료',
           liveOcrIncompleteMessage(nextSession),
@@ -2678,7 +2819,7 @@ function OcrScannerModal({
     } catch (error) {
       setResult(aggregateResult);
       setFields(aggregateResult?.fields ?? []);
-      setStage('capture');
+      setStageAnimated('capture');
       Alert.alert(
         'OCR 인식 준비 중',
         error instanceof OcrRecognizerUnavailableError || error instanceof OcrNoTextDetectedError
@@ -2796,7 +2937,7 @@ function OcrScannerModal({
                 <Ionicons name="document-text-outline" size={55} color="#89A7E8" />
                 <Text style={styles.documentPreviewTitle}>3개 필드를 찾을 때까지 스캔합니다</Text>
                 <Text style={styles.documentPreviewCaption}>
-                  상호명, 주소, 전화번호가 모두 O로 고정되면 검토 화면으로 이동합니다.
+                  상호명, 주소, 전화번호가 안정적으로 잠기면 검토 화면으로 이동합니다.
                 </Text>
               </View>
               <View style={styles.autoCaptureBadge}>
@@ -2994,7 +3135,7 @@ function OcrScannerModal({
                     value={field.value}
                     onChangeText={(value) => updateField(field.key, value)}
                     placeholder={`${field.label} 입력`}
-                    placeholderTextColor="#9AA5B7"
+                    placeholderTextColor={C.textMuted}
                     multiline={field.key === 'memo' || field.key === 'deliveryAddress'}
                     style={[
                       styles.ocrFieldInput,
@@ -3146,7 +3287,10 @@ export default function RouteloApp() {
     syncScheduledNotifications(plannedNotifications).catch(() => undefined);
   }, [plannedNotifications]);
 
-  const openNotifications = () => setActiveTab('notifications');
+  const openNotifications = () => {
+    animateLayout();
+    setActiveTab('notifications');
+  };
   const toggleSelected = async () => {
     if (!selectedDelivery) return;
     const currentOrder = orders.find(
@@ -3307,6 +3451,7 @@ export default function RouteloApp() {
       return (
         <DeliveryListScreen
           deliveries={deliveries}
+          notificationCount={notificationCount}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
         />
@@ -3319,6 +3464,7 @@ export default function RouteloApp() {
           fuelLogs={fuelLogs}
           mileageLogs={mileageLogs}
           settings={settings}
+          notificationCount={notificationCount}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
           onAddFuelLog={addFuelLog}
@@ -3335,12 +3481,20 @@ export default function RouteloApp() {
           deliveries={deliveries}
           navApp={settings.route.navApp}
           allowReorder={settings.route.allowManualReorder}
+          notificationCount={notificationCount}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
         />
       );
     }
-    if (activeTab === 'notifications') return <NotificationsScreen />;
+    if (activeTab === 'notifications') {
+      return (
+        <NotificationsScreen
+          plannedNotifications={plannedNotifications}
+          notificationCount={notificationCount}
+        />
+      );
+    }
     if (activeTab === 'settings') {
       return (
         <SettingsScreen
@@ -3354,12 +3508,26 @@ export default function RouteloApp() {
     return (
       <HomeScreen
         deliveries={deliveries}
+        notificationCount={notificationCount}
         onDeliveryPress={setSelectedDelivery}
-        onSeeAll={() => setActiveTab('deliveries')}
+        onSeeAll={() => {
+          animateLayout();
+          setActiveTab('deliveries');
+        }}
         onNotifications={openNotifications}
       />
     );
-  }, [account, activeTab, deliveries, fuelLogs, mileageLogs, orders, settings]);
+  }, [
+    account,
+    activeTab,
+    deliveries,
+    fuelLogs,
+    mileageLogs,
+    notificationCount,
+    orders,
+    plannedNotifications,
+    settings,
+  ]);
 
   const darkMode = settings.appearance.themeMode === 'dark';
   const C = darkMode ? DARK : LIGHT;
@@ -3406,7 +3574,10 @@ export default function RouteloApp() {
                 key={tab.key}
                 testID={`nav-${tab.key}`}
                 style={styles.navItem}
-                onPress={() => setActiveTab(tab.key)}
+                onPress={() => {
+                  animateLayout();
+                  setActiveTab(tab.key);
+                }}
               >
                 <View style={[styles.navIcon, selected && styles.navIconSelected]}>
                   <Ionicons
@@ -3452,6 +3623,7 @@ export default function RouteloApp() {
           order.source = { type: 'ocr' };
           setOrders((current) => [order, ...current]);
           deliveryRepository.save(order).catch(() => undefined);
+          animateLayout();
           setActiveTab('deliveries');
         }}
       />
@@ -3683,6 +3855,27 @@ const makeStyles = (C: Palette) =>
     flexWrap: 'wrap',
     gap: 8,
     marginBottom: 12,
+  },
+  sectionToggle: {
+    minHeight: 64,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.surface,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sectionToggleTitle: { color: C.text, fontSize: 14, fontWeight: '900' },
+  sectionToggleCaption: {
+    color: C.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 3,
   },
   financeInputCard: {
     backgroundColor: C.surfaceRaised,
@@ -3973,7 +4166,7 @@ const makeStyles = (C: Palette) =>
   warningBadge: { backgroundColor: C.warningBg },
   dangerBadge: { backgroundColor: C.dangerBg },
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
-  badgeText: { fontSize: 9, fontWeight: '800' },
+  badgeText: { fontSize: 10, fontWeight: '800' },
   filterSegment: {
     flexDirection: 'row',
     padding: 4,
@@ -4008,7 +4201,7 @@ const makeStyles = (C: Palette) =>
   deliveryAddress: { color: C.textMuted, fontSize: 11, marginTop: 13, lineHeight: 17 },
   deliveryTimeGrid: { flexDirection: 'row', gap: 7, marginTop: 14 },
   deliveryTimeCell: { flex: 1, minHeight: 60, padding: 9, borderRadius: 14, backgroundColor: C.surfaceAlt },
-  deliveryTimeCellLabel: { color: C.textMuted, fontSize: 8, fontWeight: '700' },
+  deliveryTimeCellLabel: { color: C.textMuted, fontSize: 10, fontWeight: '700' },
   deliveryTimeCellValue: { color: C.text, fontSize: 13, fontWeight: '800', marginTop: 7 },
   warningText: { color: C.warning },
   dangerText: { color: C.danger },
@@ -4039,7 +4232,7 @@ const makeStyles = (C: Palette) =>
   nextAddress: { color: C.textMuted, fontSize: 11, marginTop: 5 },
   nextInfoRow: { flexDirection: 'row', marginTop: 17, paddingVertical: 13, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.outline },
   nextInfo: { flex: 1 },
-  nextInfoLabel: { color: C.textMuted, fontSize: 8, fontWeight: '700' },
+  nextInfoLabel: { color: C.textMuted, fontSize: 10, fontWeight: '700' },
   nextInfoValue: { color: C.text, fontSize: 14, fontWeight: '800', marginTop: 5 },
   nextInfoDivider: { width: 1, backgroundColor: C.outline, marginHorizontal: 10 },
   priorityNotice: { marginTop: 13, padding: 11, borderRadius: 13, backgroundColor: C.dangerBg, flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -4059,9 +4252,9 @@ const makeStyles = (C: Palette) =>
   navAppOptionText: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
   navAppOptionTextActive: { color: C.primary, fontWeight: '800' },
   primaryButton: { flex: 1, minHeight: 50, borderRadius: 18, backgroundColor: C.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, shadowColor: C.primary, shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   secondaryButton: { flex: 1, minHeight: 50, borderRadius: 18, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12 },
-  secondaryButtonText: { color: C.primary, fontSize: 11, fontWeight: '800' },
+  secondaryButtonText: { color: C.primary, fontSize: 12, fontWeight: '800' },
   notificationSummary: { minHeight: 95, borderRadius: 22, padding: 17, backgroundColor: C.emphasis, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   notificationSummaryLabel: { color: '#BFCBE0', fontSize: 10 },
   notificationSummaryValue: { color: '#FFFFFF', fontSize: 25, fontWeight: '800', marginTop: 5 },
@@ -4147,22 +4340,43 @@ const makeStyles = (C: Palette) =>
   settingRow: { minHeight: 76, paddingHorizontal: 15, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
   settingIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center' },
   settingTitle: { color: C.text, fontSize: 13, fontWeight: '800' },
-  settingCaption: { color: C.textMuted, fontSize: 9, marginTop: 4 },
+  settingCaption: { color: C.textMuted, fontSize: 11, marginTop: 4, lineHeight: 16 },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(8,13,23,0.56)' },
   bottomSheet: { paddingHorizontal: 20, paddingBottom: 28, borderTopLeftRadius: 34, borderTopRightRadius: 34, backgroundColor: C.glassStrong, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.glassBorder },
   sheetHandle: { width: 46, height: 5, borderRadius: 3, backgroundColor: C.outlineStrong, alignSelf: 'center', marginTop: 10, marginBottom: 18 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 },
-  sheetEyebrow: { color: C.primary, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  sheetEyebrow: { color: C.primary, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   sheetTitle: { color: C.text, fontSize: 21, fontWeight: '800', marginTop: 4 },
   sheetAddress: { flexDirection: 'row', gap: 8, marginTop: 17, padding: 13, borderRadius: 15, backgroundColor: C.surfaceAlt },
   sheetAddressText: { flex: 1, color: C.text, fontSize: 12, lineHeight: 18 },
   sheetTimeGrid: { flexDirection: 'row', gap: 8, marginTop: 12 },
   sheetTimeItem: { flex: 1, minHeight: 70, padding: 10, borderRadius: 14, backgroundColor: C.surfaceAlt },
-  sheetTimeLabel: { color: C.textMuted, fontSize: 8, fontWeight: '700' },
+  sheetTimeLabel: { color: C.textMuted, fontSize: 10, fontWeight: '700' },
   sheetTimeValue: { color: C.text, fontSize: 15, fontWeight: '800', marginTop: 8 },
   sheetInfoBlock: { marginTop: 12, padding: 13, borderRadius: 15, backgroundColor: C.surfaceAlt },
-  sheetInfoLabel: { color: C.textMuted, fontSize: 9, fontWeight: '700' },
-  sheetInfoText: { color: C.text, fontSize: 11, lineHeight: 17, marginTop: 5 },
+  sheetInfoLabel: { color: C.textMuted, fontSize: 11, fontWeight: '700' },
+  sheetInfoText: { color: C.text, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  sheetToggleRow: {
+    minHeight: 58,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.surface,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sheetToggleTitle: { color: C.text, fontSize: 13, fontWeight: '900' },
+  sheetToggleCaption: {
+    color: C.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 3,
+  },
   sheetActions: { flexDirection: 'row', gap: 9, marginTop: 16 },
   scanFab: {
     position: 'absolute',
@@ -4198,7 +4412,7 @@ const makeStyles = (C: Palette) =>
     backgroundColor: C.surface,
   },
   scannerHeaderCopy: { flex: 1, marginHorizontal: 12 },
-  scannerEyebrow: { color: C.primary, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  scannerEyebrow: { color: C.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   scannerTitle: { color: C.text, fontSize: 20, fontWeight: '800', marginTop: 3 },
   scannerStep: {
     minWidth: 40,
@@ -4369,7 +4583,7 @@ const makeStyles = (C: Palette) =>
     justifyContent: 'center',
   },
   qualityScore: { fontSize: 18, fontWeight: '900' },
-  qualityScoreLabel: { color: C.textMuted, fontSize: 7, fontWeight: '700' },
+  qualityScoreLabel: { color: C.textMuted, fontSize: 10, fontWeight: '700' },
   qualityCard: {
     padding: 16,
     borderRadius: 22,
@@ -4382,10 +4596,10 @@ const makeStyles = (C: Palette) =>
   qualityCardTitle: { color: C.text, fontSize: 15, fontWeight: '800' },
   qualityRow: { minHeight: 37, flexDirection: 'row', alignItems: 'center', gap: 9 },
   qualityLabelGroup: { width: 78, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  qualityLabel: { color: C.textMuted, fontSize: 9, fontWeight: '700' },
+  qualityLabel: { color: C.textMuted, fontSize: 11, fontWeight: '700' },
   qualityTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: C.surfaceAlt, overflow: 'hidden' },
   qualityFill: { height: '100%', borderRadius: 4 },
-  qualityValue: { width: 25, textAlign: 'right', fontSize: 9, fontWeight: '800' },
+  qualityValue: { width: 25, textAlign: 'right', fontSize: 11, fontWeight: '800' },
   qualityWarning: {
     padding: 12,
     marginTop: 9,
@@ -4479,7 +4693,7 @@ const makeStyles = (C: Palette) =>
   ocrFieldTitleGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9 },
   ocrFieldIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center' },
   ocrFieldLabel: { color: C.text, fontSize: 11, fontWeight: '800' },
-  ocrFieldSource: { maxWidth: 205, color: C.textMuted, fontSize: 8, marginTop: 3 },
+  ocrFieldSource: { maxWidth: 205, color: C.textMuted, fontSize: 10, marginTop: 3 },
   confidenceBadge: { height: 27, paddingHorizontal: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 4 },
   confidenceText: { fontSize: 9, fontWeight: '900' },
   ocrFieldInput: {
@@ -4628,7 +4842,7 @@ const makeStyles = (C: Palette) =>
     borderWidth: 1,
     borderColor: C.glassHighlight,
   },
-  navLabel: { color: C.textMuted, fontSize: 9, fontWeight: '700', marginTop: 3 },
+  navLabel: { color: C.textMuted, fontSize: 10, fontWeight: '700', marginTop: 3 },
   navLabelSelected: { color: C.primary, fontWeight: '800' },
   navNotificationDot: { position: 'absolute', right: 9, top: 5, width: 8, height: 8, borderRadius: 4, backgroundColor: C.danger, borderWidth: 1, borderColor: C.glassStrong },
   });
