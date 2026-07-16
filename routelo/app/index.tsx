@@ -118,6 +118,7 @@ type TabKey =
   | 'notifications'
   | 'settings';
 type DeliveryFilter = 'all' | 'pending' | 'completed';
+type DeliverySort = 'deadline' | 'latest' | 'fee';
 
 export type Palette = {
   primary: string;
@@ -718,9 +719,35 @@ function DeliveryListScreen({
 }) {
   const { C, styles } = useTheme();
   const [filter, setFilter] = useState<DeliveryFilter>('all');
-  const filtered = deliveries.filter((delivery) =>
-    filter === 'all' ? true : delivery.status === filter,
-  );
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<DeliverySort>('deadline');
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const searched = deliveries.filter((delivery) => {
+      const statusMatch = filter === 'all' ? true : delivery.status === filter;
+      if (!statusMatch) return false;
+      if (!normalizedQuery) return true;
+      return [
+        delivery.productName,
+        delivery.deliveryAddress,
+        delivery.orderVendor,
+        delivery.orderVendorTel,
+        delivery.deliveryVendor,
+        delivery.deliveryVendorTel,
+        delivery.customerRequests,
+        delivery.recipientTel,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedQuery);
+    });
+    return [...searched].sort((left, right) => {
+      if (sort === 'fee') return right.fee - left.fee;
+      if (sort === 'latest') return right.id.localeCompare(left.id);
+      return left.deliveryDt.localeCompare(right.deliveryDt);
+    });
+  }, [deliveries, filter, query, sort]);
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <ScreenHeader
@@ -730,6 +757,53 @@ function DeliveryListScreen({
         notificationCount={notificationCount}
         onNotificationPress={onNotifications}
       />
+      <View style={styles.deliverySearchBox}>
+        <Ionicons name="search-outline" size={19} color={C.textMuted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="상품명, 주소, 화원명, 전화번호 검색"
+          placeholderTextColor={C.textMuted}
+          style={styles.deliverySearchInput}
+          returnKeyType="search"
+        />
+        {!!query && (
+          <Pressable
+            style={styles.searchClearButton}
+            onPress={() => setQuery('')}
+          >
+            <Ionicons name="close-circle" size={18} color={C.textMuted} />
+          </Pressable>
+        )}
+      </View>
+      <View style={styles.sortControlBlock}>
+        <Text style={styles.sortControlLabel}>정렬</Text>
+        <View style={styles.sortChipRow}>
+          {([
+            ['deadline', '마감순'],
+            ['latest', '최신순'],
+            ['fee', '금액별'],
+          ] as Array<[DeliverySort, string]>).map(([key, label]) => (
+            <Pressable
+              key={key}
+              style={[styles.sortChip, sort === key && styles.sortChipSelected]}
+              onPress={() => {
+                animateLayout();
+                setSort(key);
+              }}
+            >
+              <Text
+                style={[
+                  styles.sortChipText,
+                  sort === key && styles.sortChipTextSelected,
+                ]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
       <View style={styles.filterSegment}>
         {([
           ['all', '전체'],
@@ -751,13 +825,23 @@ function DeliveryListScreen({
         ))}
       </View>
       <View style={styles.deliveryList}>
-        {filtered.map((delivery) => (
-          <DeliveryCard
-            key={delivery.id}
-            delivery={delivery}
-            onPress={() => onDeliveryPress(delivery)}
-          />
-        ))}
+        {filtered.length === 0 ? (
+          <View style={styles.deliveryEmptyState}>
+            <Ionicons name="search-outline" size={28} color={C.textMuted} />
+            <Text style={styles.deliveryEmptyTitle}>검색 결과가 없습니다</Text>
+            <Text style={styles.deliveryEmptyText}>
+              검색어를 줄이거나 상태 필터를 전체로 바꿔보세요.
+            </Text>
+          </View>
+        ) : (
+          filtered.map((delivery) => (
+            <DeliveryCard
+              key={delivery.id}
+              delivery={delivery}
+              onPress={() => onDeliveryPress(delivery)}
+            />
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -934,8 +1018,6 @@ function RouteScreen({
   );
 }
 
-type CalendarMode = 'month' | 'week' | 'day';
-
 const formatDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
@@ -974,7 +1056,6 @@ function CalendarScreen({
   const { C, styles } = useTheme();
   const { showFullAddressInList } = usePrivacy();
   const today = new Date();
-  const [mode, setMode] = useState<CalendarMode>('month');
   const [cursor, setCursor] = useState(
     new Date(today.getFullYear(), today.getMonth(), today.getDate()),
   );
@@ -1087,20 +1168,9 @@ function CalendarScreen({
     date.setDate(monthGridStart.getDate() + index);
     return date;
   });
-  const weekStart = new Date(cursor);
-  weekStart.setDate(cursor.getDate() - cursor.getDay());
-  const weekDays = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(weekStart);
-    date.setDate(weekStart.getDate() + index);
-    return date;
-  });
-  const visibleDays =
-    mode === 'month' ? monthDays : mode === 'week' ? weekDays : [cursor];
-
   const move = (direction: number) => {
     const next = new Date(cursor);
-    if (mode === 'month') next.setMonth(cursor.getMonth() + direction, 1);
-    else next.setDate(cursor.getDate() + direction * (mode === 'week' ? 7 : 1));
+    next.setMonth(cursor.getMonth() + direction, 1);
     setCursor(next);
   };
 
@@ -1113,27 +1183,6 @@ function CalendarScreen({
         notificationCount={notificationCount}
         onNotificationPress={onNotifications}
       />
-      <View style={styles.calendarModeRow}>
-        {(['month', 'week', 'day'] as CalendarMode[]).map((item) => (
-          <Pressable
-            key={item}
-            style={[
-              styles.calendarModeButton,
-              mode === item && styles.calendarModeButtonActive,
-            ]}
-            onPress={() => setMode(item)}
-          >
-            <Text
-              style={[
-                styles.calendarModeText,
-                mode === item && styles.calendarModeTextActive,
-              ]}
-            >
-              {item === 'month' ? '월' : item === 'week' ? '주' : '일'}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
       <View style={styles.calendarCard}>
         <View style={styles.calendarToolbar}>
           <Pressable style={styles.iconButton} onPress={() => move(-1)}>
@@ -1154,13 +1203,13 @@ function CalendarScreen({
           ))}
         </View>
         <View style={styles.calendarGrid}>
-          {visibleDays.map((date) => {
+          {monthDays.map((date) => {
             const key = formatDateKey(date);
             const count = byDate.get(key)?.length || 0;
             const summary = dailySummaries.get(key);
             const selected = key === selectedDate;
             const outside =
-              mode === 'month' && date.getMonth() !== cursor.getMonth();
+              date.getMonth() !== cursor.getMonth();
             const urgent = (byDate.get(key) || []).some(
               (item) =>
                 item.priority !== 'normal' ||
@@ -1172,7 +1221,6 @@ function CalendarScreen({
                 key={key}
                 style={[
                   styles.calendarDay,
-                  mode !== 'month' && styles.calendarDayWide,
                   selected && styles.calendarDaySelected,
                 ]}
                 onPress={() => setCursor(date)}
@@ -4176,11 +4224,85 @@ const makeStyles = (C: Palette) =>
     borderColor: C.glassBorder,
     marginBottom: 14,
   },
+  deliverySearchBox: {
+    minHeight: 52,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.surface,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  deliverySearchInput: {
+    flex: 1,
+    color: C.text,
+    fontSize: 13,
+    fontWeight: '700',
+    paddingVertical: 0,
+  },
+  searchClearButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortControlBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  sortControlLabel: { color: C.textMuted, fontSize: 12, fontWeight: '800' },
+  sortChipRow: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', gap: 7 },
+  sortChip: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortChipSelected: {
+    borderColor: C.primary,
+    backgroundColor: C.primaryContainer,
+  },
+  sortChipText: { color: C.textMuted, fontSize: 12, fontWeight: '800' },
+  sortChipTextSelected: { color: C.primary },
   filterItem: { flex: 1, minHeight: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   filterItemSelected: { backgroundColor: C.glassStrong, borderWidth: 1, borderColor: C.glassHighlight },
   filterText: { color: C.textMuted, fontSize: 11, fontWeight: '700' },
   filterTextSelected: { color: C.primary, fontWeight: '800' },
   deliveryList: { gap: 11 },
+  deliveryEmptyState: {
+    minHeight: 180,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  deliveryEmptyTitle: {
+    color: C.text,
+    fontSize: 15,
+    fontWeight: '900',
+    marginTop: 10,
+  },
+  deliveryEmptyText: {
+    color: C.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 5,
+    textAlign: 'center',
+  },
   deliveryCard: {
     borderRadius: 26,
     padding: 16,
@@ -4837,11 +4959,7 @@ const makeStyles = (C: Palette) =>
   },
   navItem: { flex: 1, minHeight: 54, alignItems: 'center', justifyContent: 'center' },
   navIcon: { minWidth: 48, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  navIconSelected: {
-    backgroundColor: C.glassStrong,
-    borderWidth: 1,
-    borderColor: C.glassHighlight,
-  },
+  navIconSelected: {},
   navLabel: { color: C.textMuted, fontSize: 10, fontWeight: '700', marginTop: 3 },
   navLabelSelected: { color: C.primary, fontWeight: '800' },
   navNotificationDot: { position: 'absolute', right: 9, top: 5, width: 8, height: 8, borderRadius: 4, backgroundColor: C.danger, borderWidth: 1, borderColor: C.glassStrong },
