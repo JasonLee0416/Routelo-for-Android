@@ -11,6 +11,13 @@
         "simulator": false
       }
     },
+    "standalone-apk": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
