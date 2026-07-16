@@ -2,10 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -206,12 +208,33 @@ const DARK: Palette = {
 
 const C = LIGHT;
 
+const MOTION = {
+  quickMs: 140,
+  standardMs: 220,
+  sheetMs: 260,
+} as const;
+
+let reduceMotionEnabled = false;
+
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const animateLayout = () =>
-  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+const animateLayout = (duration: number = MOTION.standardMs) => {
+  if (reduceMotionEnabled) return;
+  LayoutAnimation.configureNext({
+    duration,
+    create: {
+      type: LayoutAnimation.Types.easeInEaseOut,
+      property: LayoutAnimation.Properties.opacity,
+    },
+    update: { type: LayoutAnimation.Types.easeInEaseOut },
+    delete: {
+      type: LayoutAnimation.Types.easeInEaseOut,
+      property: LayoutAnimation.Properties.opacity,
+    },
+  });
+};
 
 type AppStyles = ReturnType<typeof makeStyles>;
 type ThemeValue = { C: Palette; styles: AppStyles };
@@ -642,7 +665,7 @@ function HomeScreen({
   );
 }
 
-function DeliveryCard({
+const DeliveryCard = memo(function DeliveryCard({
   delivery,
   onPress,
 }: {
@@ -704,7 +727,7 @@ function DeliveryCard({
       </View>
     </View>
   );
-}
+});
 
 function DeliveryListScreen({
   deliveries,
@@ -748,84 +771,117 @@ function DeliveryListScreen({
       return left.deliveryDt.localeCompare(right.deliveryDt);
     });
   }, [deliveries, filter, query, sort]);
-  return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
-      <ScreenHeader
-        eyebrow="TODAY · DELIVERY"
-        title="오늘의 배달"
-        subtitle={`${deliveries.length}건의 배달 일정을 관리합니다.`}
-        notificationCount={notificationCount}
-        onNotificationPress={onNotifications}
+  const renderDelivery = useCallback(
+    ({ item }: { item: Delivery }) => (
+      <DeliveryCard
+        delivery={item}
+        onPress={() => onDeliveryPress(item)}
       />
-      <View style={styles.deliverySearchBox}>
-        <Ionicons name="search-outline" size={19} color={C.textMuted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="상품명, 주소, 화원명, 전화번호 검색"
-          placeholderTextColor={C.textMuted}
-          style={styles.deliverySearchInput}
-          returnKeyType="search"
+    ),
+    [onDeliveryPress],
+  );
+  const keyExtractor = useCallback((item: Delivery) => item.id, []);
+  const listHeader = useMemo(
+    () => (
+      <>
+        <ScreenHeader
+          eyebrow="TODAY · DELIVERY"
+          title="오늘의 배달"
+          subtitle={`${deliveries.length}건의 배달 일정을 관리합니다.`}
+          notificationCount={notificationCount}
+          onNotificationPress={onNotifications}
         />
-        {!!query && (
-          <Pressable
-            style={styles.searchClearButton}
-            onPress={() => setQuery('')}
-          >
-            <Ionicons name="close-circle" size={18} color={C.textMuted} />
-          </Pressable>
-        )}
-      </View>
-      <View style={styles.sortControlBlock}>
-        <Text style={styles.sortControlLabel}>정렬</Text>
-        <View style={styles.sortChipRow}>
+        <View style={styles.deliverySearchBox}>
+          <Ionicons name="search-outline" size={19} color={C.textMuted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="상품명, 주소, 화원명, 전화번호 검색"
+            placeholderTextColor={C.textMuted}
+            style={styles.deliverySearchInput}
+            returnKeyType="search"
+          />
+          {!!query && (
+            <Pressable
+              style={styles.searchClearButton}
+              onPress={() => setQuery('')}
+            >
+              <Ionicons name="close-circle" size={18} color={C.textMuted} />
+            </Pressable>
+          )}
+        </View>
+        <View style={styles.sortControlBlock}>
+          <Text style={styles.sortControlLabel}>정렬</Text>
+          <View style={styles.sortChipRow}>
+            {([
+              ['deadline', '마감순'],
+              ['latest', '최신순'],
+              ['fee', '금액별'],
+            ] as Array<[DeliverySort, string]>).map(([key, label]) => (
+              <Pressable
+                key={key}
+                style={[styles.sortChip, sort === key && styles.sortChipSelected]}
+                onPress={() => {
+                  animateLayout(MOTION.quickMs);
+                  setSort(key);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.sortChipText,
+                    sort === key && styles.sortChipTextSelected,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <View style={styles.filterSegment}>
           {([
-            ['deadline', '마감순'],
-            ['latest', '최신순'],
-            ['fee', '금액별'],
-          ] as Array<[DeliverySort, string]>).map(([key, label]) => (
+            ['all', '전체'],
+            ['pending', '대기'],
+            ['completed', '완료'],
+          ] as Array<[DeliveryFilter, string]>).map(([key, label]) => (
             <Pressable
               key={key}
-              style={[styles.sortChip, sort === key && styles.sortChipSelected]}
+              style={[styles.filterItem, filter === key && styles.filterItemSelected]}
               onPress={() => {
-                animateLayout();
-                setSort(key);
+                animateLayout(MOTION.quickMs);
+                setFilter(key);
               }}
             >
-              <Text
-                style={[
-                  styles.sortChipText,
-                  sort === key && styles.sortChipTextSelected,
-                ]}
-              >
+              <Text style={[styles.filterText, filter === key && styles.filterTextSelected]}>
                 {label}
               </Text>
             </Pressable>
           ))}
         </View>
-      </View>
-      <View style={styles.filterSegment}>
-        {([
-          ['all', '전체'],
-          ['pending', '대기'],
-          ['completed', '완료'],
-        ] as Array<[DeliveryFilter, string]>).map(([key, label]) => (
-          <Pressable
-            key={key}
-            style={[styles.filterItem, filter === key && styles.filterItemSelected]}
-            onPress={() => {
-              animateLayout();
-              setFilter(key);
-            }}
-          >
-            <Text style={[styles.filterText, filter === key && styles.filterTextSelected]}>
-              {label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <View style={styles.deliveryList}>
-        {filtered.length === 0 ? (
+      </>
+    ),
+    [
+      C.textMuted,
+      deliveries.length,
+      filter,
+      notificationCount,
+      onNotifications,
+      query,
+      sort,
+      styles,
+    ],
+  );
+  return (
+    <FlatList
+      data={filtered}
+      keyExtractor={keyExtractor}
+      renderItem={renderDelivery}
+      contentContainerStyle={styles.screenContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={listHeader}
+      ItemSeparatorComponent={() => <View style={styles.deliveryListSpacer} />}
+      ListEmptyComponent={
           <View style={styles.deliveryEmptyState}>
             <Ionicons name="search-outline" size={28} color={C.textMuted} />
             <Text style={styles.deliveryEmptyTitle}>검색 결과가 없습니다</Text>
@@ -833,17 +889,13 @@ function DeliveryListScreen({
               검색어를 줄이거나 상태 필터를 전체로 바꿔보세요.
             </Text>
           </View>
-        ) : (
-          filtered.map((delivery) => (
-            <DeliveryCard
-              key={delivery.id}
-              delivery={delivery}
-              onPress={() => onDeliveryPress(delivery)}
-            />
-          ))
-        )}
-      </View>
-    </ScrollView>
+      }
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      updateCellsBatchingPeriod={50}
+      windowSize={7}
+      removeClippedSubviews={Platform.OS === 'android'}
+    />
   );
 }
 
@@ -879,7 +931,7 @@ function RouteScreen({
   const totalDistance = order.reduce((sum, item) => sum + item.distanceKm, 0);
 
   const move = (index: number, direction: -1 | 1) => {
-    animateLayout();
+    animateLayout(MOTION.quickMs);
     setOrder((current) => {
       const target = index + direction;
       if (target < 0 || target >= current.length) return current;
@@ -1293,7 +1345,7 @@ function CalendarScreen({
       <Pressable
         style={styles.sectionToggle}
         onPress={() => {
-          animateLayout();
+          animateLayout(MOTION.quickMs);
           setFinanceExpanded((value) => !value);
         }}
       >
@@ -1391,7 +1443,7 @@ function CalendarScreen({
       <Pressable
         style={styles.sectionToggle}
         onPress={() => {
-          animateLayout();
+          animateLayout(MOTION.quickMs);
           setDataExpanded((value) => !value);
         }}
       >
@@ -1424,7 +1476,7 @@ function CalendarScreen({
       <Pressable
         style={styles.sectionToggle}
         onPress={() => {
-          animateLayout();
+          animateLayout(MOTION.quickMs);
           setAgendaExpanded((value) => !value);
         }}
       >
@@ -2386,7 +2438,7 @@ function DeliveryDetailSheet({
           <Pressable
             style={styles.sheetToggleRow}
             onPress={() => {
-              animateLayout();
+              animateLayout(MOTION.sheetMs);
               setProofExpanded((value) => !value);
             }}
           >
@@ -2444,7 +2496,7 @@ function DeliveryDetailSheet({
           <Pressable
             style={styles.sheetToggleRow}
             onPress={() => {
-              animateLayout();
+              animateLayout(MOTION.sheetMs);
               setIssueExpanded((value) => !value);
             }}
           >
@@ -2774,7 +2826,7 @@ function OcrScannerModal({
   };
 
   const setStageAnimated = (next: ScanStage) => {
-    animateLayout();
+    animateLayout(MOTION.standardMs);
     setStage(next);
   };
 
@@ -3293,6 +3345,21 @@ export default function RouteloApp() {
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
 
   useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        reduceMotionEnabled = enabled;
+      })
+      .catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      (enabled) => {
+        reduceMotionEnabled = enabled;
+      },
+    );
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
     deliveryRepository
       .initialize()
       .then(async () => {
@@ -3336,7 +3403,7 @@ export default function RouteloApp() {
   }, [plannedNotifications]);
 
   const openNotifications = () => {
-    animateLayout();
+    animateLayout(MOTION.quickMs);
     setActiveTab('notifications');
   };
   const toggleSelected = async () => {
@@ -3559,7 +3626,7 @@ export default function RouteloApp() {
         notificationCount={notificationCount}
         onDeliveryPress={setSelectedDelivery}
         onSeeAll={() => {
-          animateLayout();
+          animateLayout(MOTION.quickMs);
           setActiveTab('deliveries');
         }}
         onNotifications={openNotifications}
@@ -3623,7 +3690,7 @@ export default function RouteloApp() {
                 testID={`nav-${tab.key}`}
                 style={styles.navItem}
                 onPress={() => {
-                  animateLayout();
+                  animateLayout(MOTION.quickMs);
                   setActiveTab(tab.key);
                 }}
               >
@@ -3671,7 +3738,7 @@ export default function RouteloApp() {
           order.source = { type: 'ocr' };
           setOrders((current) => [order, ...current]);
           deliveryRepository.save(order).catch(() => undefined);
-          animateLayout();
+          animateLayout(MOTION.quickMs);
           setActiveTab('deliveries');
         }}
       />
@@ -4280,6 +4347,7 @@ const makeStyles = (C: Palette) =>
   filterText: { color: C.textMuted, fontSize: 11, fontWeight: '700' },
   filterTextSelected: { color: C.primary, fontWeight: '800' },
   deliveryList: { gap: 11 },
+  deliveryListSpacer: { height: 11 },
   deliveryEmptyState: {
     minHeight: 180,
     borderRadius: 24,
