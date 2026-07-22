@@ -3,6 +3,7 @@ import {
   ReceiptDocument,
   RoutePlan,
 } from '../domain';
+import { ContactLog, FuelLog, MileageLog } from '../models';
 
 export interface DeliveryRepository {
   initialize(): Promise<void>;
@@ -32,9 +33,29 @@ export interface RoutePlanRepository {
   remove(serviceDate: string): Promise<void>;
 }
 
+export interface FuelLogRepository {
+  list(): Promise<FuelLog[]>;
+  save(log: FuelLog): Promise<void>;
+  saveAll(logs: FuelLog[]): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+export interface MileageLogRepository {
+  list(): Promise<MileageLog[]>;
+  save(log: MileageLog): Promise<void>;
+  saveAll(logs: MileageLog[]): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+export interface ContactLogRepository {
+  list(): Promise<ContactLog[]>;
+  save(log: ContactLog): Promise<void>;
+  saveAll(logs: ContactLog[]): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
 export interface KeyValueStore {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
   removeItem(key: string): Promise<void>;
 }
-

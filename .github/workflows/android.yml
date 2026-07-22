@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EXPO_PUBLIC_ROUTELO_OCR_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.ocr_profile || 'stable-mobile' }}
-      ROUTELO_APK_KIND: ${{ github.event_name == 'workflow_dispatch' && inputs.apk_kind || 'development-debug' }}
+      ROUTELO_APK_KIND: ${{ github.event_name == 'workflow_dispatch' && inputs.apk_kind || 'standalone-release' }}
     defaults:
       run:
         working-directory: routelo
@@ -93,7 +93,7 @@ jobs:
 
       - name: Build standalone release APK
         if: env.ROUTELO_APK_KIND == 'standalone-release'
-        run: ./android/gradlew -p android :app:assembleRelease --no-daemon
+        run: ./android/gradlew -p android :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
 
       - name: Upload development debug APK
         if: env.ROUTELO_APK_KIND == 'development-debug'

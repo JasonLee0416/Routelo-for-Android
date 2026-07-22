@@ -25,6 +25,7 @@ export type FuelLog = {
   liters: number;
   amount: number;
   odometerKm: number;
+  vehicle?: string;
 };
 
 export type MileageLog = {
@@ -32,6 +33,22 @@ export type MileageLog = {
   date: string;
   odometerKm: number;
   dailyDistanceKm: number;
+  vehicle?: string;
+};
+
+export type ContactChannel =
+  | 'recipient'
+  | 'orderingVendor'
+  | 'fulfillingVendor'
+  | 'other';
+
+export type ContactLog = {
+  id: string;
+  deliveryId: string;
+  channel: ContactChannel;
+  label: string;
+  phone: string;
+  at: string;
 };
 
 export type OcrForm = {
@@ -80,6 +97,7 @@ export type OcrFieldResult = {
   validationErrors?: string[];
   alternatives: string[];
   status: 'confirmed' | 'review' | 'warning' | 'missing';
+  phoneKind?: 'direct' | 'safe';
 };
 
 export type CaptureQuality = {
@@ -94,7 +112,7 @@ export type CaptureQuality = {
 };
 
 export type OcrPipelineResult = {
-  engine: 'ppocrv5' | 'fixture';
+  engine: 'ppocrv5' | 'clova' | 'fixture';
   modelVersion?: string;
   rawText: string;
   recognizedLines?: Array<{
@@ -115,4 +133,10 @@ export type OcrPipelineResult = {
   variantsCompared: number;
   // 어떤 필드에도 매핑되지 않은 줄(라벨/값). 버리지 않고 보존한다(무손실).
   unmapped: { label: string; value: string }[];
+  conflicts?: { keys: OcrFieldKey[]; message: string }[];
+  cloudFallback?: { trigger: boolean; reasons: string[] };
+  eventType?: {
+    type: 'congratulation' | 'condolence' | 'opening' | 'other';
+    confidence: number;
+  };
 };

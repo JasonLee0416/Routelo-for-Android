@@ -70,7 +70,13 @@ export type SettlementInfo = {
   district?: string;
 };
 
-export type ProofOfDeliveryStatus = 'completed' | 'failed' | 'revisitNeeded';
+// 'pending'은 증거(사진)만 수집되고 배송 결과는 아직 기록되지 않은 상태.
+// 사진 첨부만으로 완료 처리되지 않도록 결과 상태와 분리한다.
+export type ProofOfDeliveryStatus =
+  | 'pending'
+  | 'completed'
+  | 'failed'
+  | 'revisitNeeded';
 
 export type ProofOfDelivery = {
   status: ProofOfDeliveryStatus;
@@ -105,7 +111,7 @@ export type DeliveryOrder = {
   updatedAt: string;
 };
 
-export type OcrEngine = 'ppocrv5' | 'fixture';
+export type OcrEngine = 'ppocrv5' | 'clova' | 'fixture';
 
 export type OcrPoint = { x: number; y: number };
 

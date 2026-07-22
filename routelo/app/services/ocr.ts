@@ -9,6 +9,7 @@ import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
 import { applyOfficialOcrFieldGuardrails } from '../ocr/fieldValidation';
 import { buildLayoutText } from '../ocr/layout';
 import { normalizeReceipt } from '../ocr/normalize';
+import { enrichOcrPipelineResult } from './ocrMetadata';
 
 type ImageAssetInfo = {
   uri?: string;
@@ -715,7 +716,7 @@ export function parseReceiptText(
     requiredFields.reduce((sum, item) => sum + item.confidence, 0) /
       Math.max(requiredFields.length, 1),
   );
-  return {
+  return enrichOcrPipelineResult({
     engine: 'fixture',
     rawText: text,
     fields,
@@ -724,7 +725,7 @@ export function parseReceiptText(
     processingMs: Date.now() - started,
     variantsCompared: 1,
     unmapped,
-  };
+  });
 }
 
 export async function runReceiptOcr(
@@ -754,14 +755,14 @@ export async function runReceiptOcr(
       recognized.fullText,
     );
     const parsed = parseReceiptText(layoutText, quality);
-    return {
+    return enrichOcrPipelineResult({
       ...parsed,
       engine: 'ppocrv5',
       modelVersion: recognized.modelVersion,
       recognizedLines: recognized.lines,
       processingMs: recognized.processingMs,
       variantsCompared: recognized.variantsCompared ?? parsed.variantsCompared,
-    };
+    });
   } catch (error) {
     if (error instanceof OcrNoTextDetectedError) throw error;
     throw new OcrRecognizerUnavailableError(

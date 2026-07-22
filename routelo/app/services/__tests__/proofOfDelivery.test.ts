@@ -1,5 +1,6 @@
 import { DeliveryOrder } from '../../domain';
 import {
+  appendProofPhoto,
   clearProofOfDelivery,
   completeDeliveryWithProof,
   failDeliveryWithProof,
@@ -36,6 +37,38 @@ describe('proof reason helpers', () => {
     expect(hasProofReason('수령인 부재')).toBe(true);
     expect(hasProofReason('   ')).toBe(false);
     expect(hasProofReason(undefined)).toBe(false);
+  });
+});
+
+describe('appendProofPhoto', () => {
+  it('never flips a pending delivery to completed', () => {
+    const next = appendProofPhoto(order, 'photos/a.jpg');
+    // 전달 전에 찍은 증거 사진이 배송을 완료로 뒤집으면 안 된다.
+    expect(next.status).toBe('pending');
+    expect(next.schedule.completedAt).toBeUndefined();
+    expect(next.proofOfDelivery?.status).toBe('pending');
+    expect(next.proofOfDelivery?.photoUris).toEqual(['photos/a.jpg']);
+  });
+
+  it('preserves an existing proof outcome and its reason', () => {
+    const failed = failDeliveryWithProof(order, { failureReason: '수령인 부재' });
+    const next = appendProofPhoto(failed, 'photos/b.jpg');
+    expect(next.status).toBe('failed');
+    expect(next.proofOfDelivery?.status).toBe('failed');
+    expect(next.proofOfDelivery?.failureReason).toBe('수령인 부재');
+    expect(next.proofOfDelivery?.photoUris).toEqual(['photos/b.jpg']);
+  });
+
+  it('keeps a completed delivery completed without restamping completedAt', () => {
+    const done = completeDeliveryWithProof(
+      order,
+      { completedAt: '2026-07-10T01:00:00.000Z' },
+      '2026-07-10T01:00:00.000Z',
+    );
+    const next = appendProofPhoto(done, 'photos/c.jpg');
+    expect(next.status).toBe('completed');
+    expect(next.schedule.completedAt).toBe('2026-07-10T01:00:00.000Z');
+    expect(next.proofOfDelivery?.photoUris).toEqual(['photos/c.jpg']);
   });
 });
 
