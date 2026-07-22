@@ -2,7 +2,8 @@ import { DailyProfitSummary } from './profit';
 
 const csvCell = (value: string | number) => {
   const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  // \r 단독 개행도 행을 깨뜨리므로 함께 인용 처리한다.
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
 export function buildDailyProfitCsv(

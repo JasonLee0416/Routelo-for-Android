@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
@@ -73,7 +74,11 @@ import {
   markDeliveryForRevisitWithProof,
 } from './services/proofOfDelivery';
 import { summarizeDailyProfit } from './services/profit';
-import { buildBackupJson, parseBackup } from './services/backup';
+import {
+  buildBackupJson,
+  parseBackup,
+  type RouteloBackup,
+} from './services/backup';
 import { completionPhotoUri, persistCompletionPhoto } from './services/completionPhoto';
 import { summarizeEfficiencyByVehicle } from './services/efficiency';
 import { buildDailyProfitCsv } from './services/export';
@@ -3476,24 +3481,41 @@ export default function RouteloApp() {
     if (!selectedDelivery) return;
     const currentOrder = orders.find((item) => item.id === selectedDelivery.id);
     if (!currentOrder) return;
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.88,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 0.88,
-          });
-    if (result.canceled || !result.assets[0]?.uri) return;
-    const relativePath = await persistCompletionPhoto(
-      currentOrder.id,
-      result.assets[0].uri,
-    );
-    await updateSelectedOrder(
-      appendProofPhoto(currentOrder, relativePath, new Date().toISOString()),
-    );
+    try {
+      // 인수증 스캔 경로와 동일하게 권한을 먼저 확인한다(권한 없이 호출하면
+      // 픽커가 조용히 실패하고 사용자는 아무 안내도 받지 못한다).
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          '권한 필요',
+          '배송 증거 사진을 촬영하거나 불러오려면 사진 접근 권한이 필요합니다.',
+        );
+        return;
+      }
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              quality: 0.88,
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.88,
+            });
+      if (result.canceled || !result.assets[0]?.uri) return;
+      const relativePath = await persistCompletionPhoto(
+        currentOrder.id,
+        result.assets[0].uri,
+      );
+      await updateSelectedOrder(
+        appendProofPhoto(currentOrder, relativePath, new Date().toISOString()),
+      );
+    } catch {
+      Alert.alert('사진 첨부 실패', '사진을 저장하지 못했습니다. 다시 시도해 주세요.');
+    }
   };
 
   const callSelectedRecipient = async () => {
@@ -3511,19 +3533,36 @@ export default function RouteloApp() {
     await contactLogRepository.save(log);
   };
 
-  const writeTextFile = async (name: string, text: string) => {
-    const uri = `${FileSystem.documentDirectory}${name}`;
-    await FileSystem.writeAsStringAsync(uri, text);
-    Alert.alert('저장 완료', uri);
+  // 앱 전용 디렉터리에만 쓰면 사용자가 파일에 접근할 수 없어 백업 목적(기기 이전)을
+  // 달성하지 못한다. 저장 후 공유 시트를 띄워 실제로 밖으로 꺼낼 수 있게 한다.
+  const writeAndShare = async (name: string, text: string, mimeType: string) => {
+    try {
+      const uri = `${FileSystem.documentDirectory}${name}`;
+      await FileSystem.writeAsStringAsync(uri, text);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType, UTI: mimeType });
+        return;
+      }
+      Alert.alert(
+        '저장 완료',
+        `${name} 파일을 앱 저장소에 저장했습니다. 이 기기에서만 복원할 수 있습니다.`,
+      );
+    } catch {
+      Alert.alert('내보내기 실패', '파일을 저장하지 못했습니다. 다시 시도해 주세요.');
+    }
   };
 
   const exportCsv = async () => {
     const daily = summarizeDailyProfit(orders, fuelLogs, settings);
-    await writeTextFile('routelo-profit.csv', buildDailyProfitCsv(daily));
+    await writeAndShare(
+      'routelo-profit.csv',
+      buildDailyProfitCsv(daily),
+      'text/csv',
+    );
   };
 
   const exportBackup = async () => {
-    await writeTextFile(
+    await writeAndShare(
       'routelo-backup.json',
       buildBackupJson({
         exportedAt: new Date().toISOString(),
@@ -3533,32 +3572,62 @@ export default function RouteloApp() {
         contactLogs,
         settings,
       }),
+      'application/json',
     );
+  };
+
+  const applyRestoredBackup = async (backup: RouteloBackup) => {
+    try {
+      // 저장소를 먼저 확정한 뒤 화면 상태를 갱신한다. 중간 실패 시
+      // 화면만 복원되고 저장소는 반쯤 쓰인 상태로 남는 것을 막는다.
+      await deliveryRepository.saveAll(backup.orders);
+      await fuelLogRepository.saveAll(backup.fuelLogs);
+      await mileageLogRepository.saveAll(backup.mileageLogs);
+      await contactLogRepository.saveAll(backup.contactLogs);
+      await settingsRepository.save(backup.settings);
+      setOrders(backup.orders);
+      setFuelLogs(backup.fuelLogs);
+      setMileageLogs(backup.mileageLogs);
+      setContactLogs(backup.contactLogs);
+      setSettings(backup.settings);
+      Alert.alert('복원 완료', 'Routelo 백업 데이터를 복원했습니다.');
+    } catch {
+      Alert.alert(
+        '복원 실패',
+        '백업을 저장하는 중 문제가 발생했습니다. 기존 데이터를 확인해 주세요.',
+      );
+    }
   };
 
   const restoreBackup = async () => {
     const uri = `${FileSystem.documentDirectory}routelo-backup.json`;
+    let text: string;
     try {
-      const text = await FileSystem.readAsStringAsync(uri);
-      const parsed = parseBackup(text);
-      if (!parsed.ok) {
-        Alert.alert('복원 실패', parsed.error);
-        return;
-      }
-      setOrders(parsed.backup.orders);
-      setFuelLogs(parsed.backup.fuelLogs);
-      setMileageLogs(parsed.backup.mileageLogs);
-      setContactLogs(parsed.backup.contactLogs);
-      setSettings(parsed.backup.settings);
-      await deliveryRepository.saveAll(parsed.backup.orders);
-      await fuelLogRepository.saveAll(parsed.backup.fuelLogs);
-      await mileageLogRepository.saveAll(parsed.backup.mileageLogs);
-      await contactLogRepository.saveAll(parsed.backup.contactLogs);
-      await settingsRepository.save(parsed.backup.settings);
-      Alert.alert('복원 완료', 'Routelo 백업 데이터를 복원했습니다.');
-    } catch (error) {
+      text = await FileSystem.readAsStringAsync(uri);
+    } catch {
       Alert.alert('복원 파일 없음', `${uri} 파일을 찾을 수 없습니다.`);
+      return;
     }
+    const parsed = parseBackup(text);
+    if (!parsed.ok) {
+      Alert.alert('복원 실패', parsed.error);
+      return;
+    }
+    // 복원은 현재 배송·주유·주행·설정을 전부 덮어쓰는 파괴적 동작이다.
+    Alert.alert(
+      '백업 복원',
+      `현재 데이터를 모두 덮어씁니다.\n배송 ${parsed.backup.orders.length}건을 복원할까요?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '복원',
+          style: 'destructive',
+          onPress: () => {
+            void applyRestoredBackup(parsed.backup);
+          },
+        },
+      ],
+    );
   };
 
   const screen = useMemo(() => {

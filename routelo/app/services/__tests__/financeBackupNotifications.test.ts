@@ -81,6 +81,82 @@ describe('finance logs and backup helpers', () => {
     expect(parsed.ok).toBe(true);
     if (parsed.ok) expect(parsed.backup.orders).toHaveLength(1);
   });
+
+  it('escapes CSV cells containing commas, quotes and newlines', () => {
+    const messy = [
+      ['plain', 'plain'],
+      ['a,b', '"a,b"'],
+      ['say "hi"', '"say ""hi"""'],
+      ['line\nbreak', '"line\nbreak"'],
+      ['carriage\rreturn', '"carriage\rreturn"'],
+    ] as const;
+    for (const [input, expected] of messy) {
+      const csv = buildDailyProfitCsv(
+        new Map([
+          [
+            input,
+            { revenue: 1, fuelCost: 0, net: 1, count: 1 } as never,
+          ],
+        ]),
+      );
+      expect(csv).toContain(expected);
+    }
+  });
+
+  it('rejects malformed backups instead of poisoning app state', () => {
+    expect(parseBackup('not json').ok).toBe(false);
+    expect(parseBackup(JSON.stringify({ app: 'other' })).ok).toBe(false);
+    // id만 있는 임의 객체는 주문으로 통과하면 안 된다.
+    const junkOrders = JSON.stringify({
+      app: 'routelo-android',
+      schemaVersion: 1,
+      orders: [{ id: 'x' }],
+      fuelLogs: [],
+      mileageLogs: [],
+      settings: DEFAULT_ROUTELO_SETTINGS,
+    });
+    expect(parseBackup(junkOrders).ok).toBe(false);
+  });
+
+  it('normalizes partial settings so restore cannot crash the app', () => {
+    const partial = JSON.stringify({
+      app: 'routelo-android',
+      schemaVersion: 1,
+      orders: [],
+      fuelLogs: [],
+      mileageLogs: [],
+      settings: {},
+    });
+    const parsed = parseBackup(partial);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      // 빈 설정이 그대로 들어오면 appearance/route/notifications 접근이 터진다.
+      expect(parsed.backup.settings.appearance).toBeDefined();
+      expect(parsed.backup.settings.route).toBeDefined();
+      expect(parsed.backup.settings.notifications).toBeDefined();
+    }
+  });
+
+  it('fills missing proof photoUris from cross-platform backups', () => {
+    const iosBackup = JSON.stringify({
+      app: 'routelo-for-ios',
+      schemaVersion: 1,
+      orders: [
+        {
+          ...order('order-ios'),
+          proofOfDelivery: { status: 'completed', recordedAt: 'now' },
+        },
+      ],
+      fuelLogs: [],
+      mileageLogs: [],
+      settings: DEFAULT_ROUTELO_SETTINGS,
+    });
+    const parsed = parseBackup(iosBackup);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.backup.orders[0].proofOfDelivery?.photoUris).toEqual([]);
+    }
+  });
 });
 
 describe('notification planning', () => {

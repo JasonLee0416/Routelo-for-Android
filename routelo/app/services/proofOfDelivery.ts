@@ -129,26 +129,19 @@ export function appendProofPhoto(
   photoUri: string,
   now = new Date().toISOString(),
 ): DeliveryOrder {
-  const proof = order.proofOfDelivery || {
-    status: 'completed' as const,
+  // 사진 첨부는 '증거 수집'일 뿐 배송 결과가 아니다. 전달 전에 찍은 사진이
+  // 배송을 완료로 뒤집던 문제가 있어, 여기서는 order.status/completedAt을
+  // 절대 건드리지 않는다. 완료/실패/재방문은 전용 함수로만 기록한다.
+  const proof: ProofOfDelivery = order.proofOfDelivery ?? {
+    status: 'pending',
     recordedAt: now,
-    completedAt: now,
     photoUris: [],
-    note: 'Completion proof photo attached.',
   };
   return {
     ...order,
-    status: proof.status === 'completed' ? 'completed' : order.status,
-    schedule: {
-      ...order.schedule,
-      completedAt:
-        proof.status === 'completed'
-          ? order.schedule.completedAt || now
-          : order.schedule.completedAt,
-    },
     proofOfDelivery: {
       ...proof,
-      photoUris: [...proof.photoUris, photoUri],
+      photoUris: [...(proof.photoUris ?? []), photoUri],
     },
     updatedAt: now,
   };
