@@ -10,11 +10,9 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import {
-  AccessibilityInfo,
   ActivityIndicator,
   Alert,
   Animated,
@@ -3346,8 +3344,12 @@ export default function RouteloApp() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const reduceMotion = useReduceMotion();
-  // 탭마다 독립적인 리플 진행도(0→1). 탭 개수는 고정이라 최초 1회만 생성한다.
-  const navRipples = useRef(tabs.map(() => new Animated.Value(0))).current;
+  // 탭마다 독립적인 리플 진행도(0→1). useRef는 인자를 매 렌더 평가하므로
+  // useMemo로 최초 1회만 생성한다(탭 개수는 모듈 상수라 고정).
+  const navRipples = useMemo(
+    () => tabs.map(() => new Animated.Value(0)),
+    [],
+  );
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const deliveries = useMemo(
     () => orders.map(orderToLegacyDelivery),
@@ -3364,20 +3366,11 @@ export default function RouteloApp() {
   const [mileageLogs, setMileageLogs] = useState<MileageLog[]>([]);
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
 
+  // 모션 설정 구독은 useReduceMotion 훅 하나로 통일한다. animateLayout은 모듈
+  // 스코프 함수라 훅 값을 직접 못 읽으므로, 훅 결과를 전역 플래그에 반영한다.
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        reduceMotionEnabled = enabled;
-      })
-      .catch(() => undefined);
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      (enabled) => {
-        reduceMotionEnabled = enabled;
-      },
-    );
-    return () => subscription.remove();
-  }, []);
+    reduceMotionEnabled = reduceMotion;
+  }, [reduceMotion]);
 
   useEffect(() => {
     deliveryRepository

@@ -29,7 +29,10 @@ export const NAV_RIPPLE = {
   size: 44,
   fromOpacity: 0.22,
   fromScale: 0.35,
-  toScale: 1.7,
+  // 리플 원의 중심은 바 상단에서 28px(top 6 + 반지름 22)이라 확대 배율이
+  // 28/22 ≈ 1.27을 넘으면 둥근 내비 바 위로 삐져나온다. 바에 overflow:hidden을
+  // 주면 Android에서 elevation 그림자와 충돌할 수 있어 배율로 가둔다.
+  toScale: 1.25,
 } as const;
 
 export const PROFIT_BARS = {
