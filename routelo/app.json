@@ -19,7 +19,8 @@
     "android": {
       "package": "com.jasonlee0312.routelo",
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -35,7 +36,9 @@
     "plugins": [
       "expo-font",
       "onnxruntime-react-native",
-      "./plugins/withAndroidPpocrFrameRecognizer"
+      "./plugins/withAndroidPpocrFrameRecognizer",
+      "expo-sharing",
+      "expo-notifications"
     ]
   }
 }
