@@ -7,15 +7,26 @@ const withSlash = (value: string) => (value.endsWith('/') ? value : `${value}/`)
 const safe = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '_') || 'x';
 
 export function photoRelativePath(dir: string, orderId: string, token: string) {
-  return `${dir}/${safe(orderId)}-${safe(token)}.jpg`;
+  return `${safe(dir)}/${safe(orderId)}-${safe(token)}.jpg`;
 }
 
 export function completionPhotoRelativePath(orderId: string, token: string) {
   return photoRelativePath(COMPLETION_PHOTO_DIR, orderId, token);
 }
 
+// 우리가 쓴 경로만 허용한다. 사진 경로는 백업 JSON에서도 들어오므로, 손댄
+// 파일의 '../../..' 같은 값이 그대로 file:// URI가 되지 않도록 읽기 시점에도 검증한다.
+const PHOTO_PATH_PATTERN = new RegExp(
+  `^(${COMPLETION_PHOTO_DIR}|${RECEIPT_PHOTO_DIR})/[A-Za-z0-9_-]+\\.jpg$`,
+);
+
+export function isSafePhotoPath(relativePath?: string): boolean {
+  return Boolean(relativePath && PHOTO_PATH_PATTERN.test(relativePath));
+}
+
 // 저장은 상대 경로, 표시는 현재 문서 디렉터리 기준으로 다시 해석한다.
-export function completionPhotoUri(relativePath: string) {
+export function completionPhotoUri(relativePath: string): string | undefined {
+  if (!isSafePhotoPath(relativePath)) return undefined;
   return `${withSlash(FileSystem.documentDirectory || '')}${relativePath}`;
 }
 

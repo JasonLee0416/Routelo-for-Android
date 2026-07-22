@@ -191,3 +191,35 @@ describe('buildProfitTrend', () => {
     expect(buildProfitTrend(new Map())).toEqual([]);
   });
 });
+
+describe('buildProfitTrend future dates', () => {
+  const summary = (net: number): DailyProfitSummary => ({
+    revenue: net,
+    fuelCost: 0,
+    net,
+    count: 1,
+  });
+
+  it('excludes scheduled future deliveries from the recent-actuals trend', () => {
+    const today = new Date(2026, 6, 22); // 2026-07-22 (local)
+    const daily = new Map<string, DailyProfitSummary>([
+      ['2026-07-20', summary(1000)],
+      ['2026-07-22', summary(2000)],
+      // 다음 달로 예약된 배송은 아직 실적이 아니다.
+      ['2026-08-15', summary(9999)],
+    ]);
+    const trend = buildProfitTrend(daily, 8, today);
+    expect(trend.map((point) => point.date)).toEqual([
+      '2026-07-20',
+      '2026-07-22',
+    ]);
+  });
+
+  it('keeps today itself in the window', () => {
+    const today = new Date(2026, 6, 22);
+    const daily = new Map<string, DailyProfitSummary>([
+      ['2026-07-22', summary(500)],
+    ]);
+    expect(buildProfitTrend(daily, 8, today)).toHaveLength(1);
+  });
+});

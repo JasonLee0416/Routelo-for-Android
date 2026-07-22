@@ -1,6 +1,7 @@
 import {
   COMPLETION_PHOTO_DIR,
   completionPhotoRelativePath,
+  isSafePhotoPath,
   photoRelativePath,
   RECEIPT_PHOTO_DIR,
 } from '../completionPhoto';
@@ -27,5 +28,26 @@ describe('photo paths', () => {
     const path = photoRelativePath(RECEIPT_PHOTO_DIR, 'order-1', '1');
     expect(path.startsWith('file:')).toBe(false);
     expect(path.startsWith('/')).toBe(false);
+  });
+});
+
+describe('isSafePhotoPath', () => {
+  it('accepts paths this app writes', () => {
+    expect(isSafePhotoPath(completionPhotoRelativePath('order-1', '1'))).toBe(
+      true,
+    );
+    expect(
+      isSafePhotoPath(photoRelativePath(RECEIPT_PHOTO_DIR, 'order-1', '1')),
+    ).toBe(true);
+  });
+
+  it('rejects traversal and foreign paths that arrive via backups', () => {
+    // 손댄 백업 JSON의 receiptPhotoPath가 그대로 file:// URI가 되면 안 된다.
+    expect(isSafePhotoPath('../../../etc/passwd')).toBe(false);
+    expect(isSafePhotoPath(`${RECEIPT_PHOTO_DIR}/../../secret.jpg`)).toBe(false);
+    expect(isSafePhotoPath('other-dir/a.jpg')).toBe(false);
+    expect(isSafePhotoPath(`${RECEIPT_PHOTO_DIR}/a.png`)).toBe(false);
+    expect(isSafePhotoPath('')).toBe(false);
+    expect(isSafePhotoPath(undefined)).toBe(false);
   });
 });

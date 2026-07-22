@@ -10,6 +10,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -2584,15 +2585,20 @@ function DeliveryDetailSheet({
               {(order?.proofOfDelivery?.photoUris.length || 0) > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.proofPhotoRow}>
-                    {order?.proofOfDelivery?.photoUris.map((uri) => (
-                      <Image
-                        key={uri}
-                        source={{
-                          uri: uri.startsWith('file:') ? uri : completionPhotoUri(uri),
-                        }}
-                        style={styles.proofPhotoThumb}
-                      />
-                    ))}
+                    {order?.proofOfDelivery?.photoUris.map((uri) => {
+                      // 경로 검증에 실패한 항목은 아예 그리지 않는다.
+                      const resolved = uri.startsWith('file:')
+                        ? uri
+                        : completionPhotoUri(uri);
+                      if (!resolved) return null;
+                      return (
+                        <Image
+                          key={uri}
+                          source={{ uri: resolved }}
+                          style={styles.proofPhotoThumb}
+                        />
+                      );
+                    })}
                   </View>
                 </ScrollView>
               ) : (
@@ -3965,11 +3971,19 @@ export default function RouteloApp() {
           if (receiptUri) {
             void persistReceiptPhoto(order.id, receiptUri)
               .then(async (relativePath) => {
-                const stored = { ...order, receiptPhotoPath: relativePath };
+                // 사진 복사는 수백 ms 걸리고 그 사이 사용자가 배송을 완료/실패로
+                // 바꿀 수 있다. 등록 시점 스냅샷(order)을 그대로 저장하면 그 편집이
+                // 덮여 사라지므로 반드시 최신 상태에 병합한다.
+                let merged: DeliveryOrder | undefined;
                 setOrders((current) =>
-                  current.map((item) => (item.id === stored.id ? stored : item)),
+                  current.map((item) => {
+                    if (item.id !== order.id) return item;
+                    merged = { ...item, receiptPhotoPath: relativePath };
+                    return merged;
+                  }),
                 );
-                await deliveryRepository.save(stored);
+                // 목록에서 사라진 주문이면 저장소에 되살리지 않는다.
+                if (merged) await deliveryRepository.save(merged);
               })
               .catch(() => undefined);
           }
@@ -4174,7 +4188,9 @@ const makeStyles = (C: Palette) =>
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-around',
-    height: 132,
+    // 막대 최대 102 + 값/라벨 텍스트 + gap. 여유를 두지 않으면 글꼴 확대 시
+    // 상단 금액 라벨부터 잘린다.
+    height: 140,
   },
   profitTrendItem: { alignItems: 'center', flex: 1, gap: 4 },
   profitTrendValue: { fontSize: 9, fontWeight: '700' },
