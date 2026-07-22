@@ -86,6 +86,29 @@ export function createCalendarProfitDays(
     }));
 }
 
+export type ProfitTrendPoint = {
+  date: string;
+  label: string;
+  net: number;
+};
+
+// 달력 손익 추이 막대용 최근 N일. 실적이 있는 날짜만 날짜순으로 추린다
+// (빈 날짜까지 그리면 막대가 뭉개져 추세가 안 보임).
+export function buildProfitTrend(
+  daily: Map<string, DailyProfitSummary>,
+  count = 8,
+): ProfitTrendPoint[] {
+  return [...daily.entries()]
+    .filter(([, summary]) => summary.count > 0 || summary.fuelCost > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-count)
+    .map(([date, summary]) => ({
+      date,
+      label: date.slice(5).replace('-', '/'),
+      net: summary.net,
+    }));
+}
+
 export function summarizePeriodProfit(
   days: CalendarProfitDay[],
 ): PeriodProfitSummary {
