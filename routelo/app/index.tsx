@@ -3,11 +3,22 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -74,6 +85,7 @@ import {
   markDeliveryForRevisitWithProof,
 } from './services/proofOfDelivery';
 import { summarizeDailyProfit } from './services/profit';
+import { NAV_RIPPLE, useReduceMotion } from './ui/motion';
 import {
   buildBackupJson,
   parseBackup,
@@ -3333,6 +3345,9 @@ function OcrScannerModal({
 export default function RouteloApp() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
+  const reduceMotion = useReduceMotion();
+  // 탭마다 독립적인 리플 진행도(0→1). 탭 개수는 고정이라 최초 1회만 생성한다.
+  const navRipples = useRef(tabs.map(() => new Animated.Value(0))).current;
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const deliveries = useMemo(
     () => orders.map(orderToLegacyDelivery),
@@ -3751,7 +3766,7 @@ export default function RouteloApp() {
             },
           ]}
         >
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const selected = tab.key === activeTab;
             return (
               <Pressable
@@ -3761,8 +3776,43 @@ export default function RouteloApp() {
                 onPress={() => {
                   animateLayout(MOTION.quickMs);
                   setActiveTab(tab.key);
+                  if (!reduceMotion) {
+                    const ripple = navRipples[index];
+                    ripple.setValue(0);
+                    Animated.timing(ripple, {
+                      toValue: 1,
+                      duration: NAV_RIPPLE.durationMs,
+                      easing: Easing.out(Easing.quad),
+                      useNativeDriver: true,
+                    }).start();
+                  }
                 }}
               >
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    left: '50%',
+                    marginLeft: -NAV_RIPPLE.size / 2,
+                    width: NAV_RIPPLE.size,
+                    height: NAV_RIPPLE.size,
+                    borderRadius: NAV_RIPPLE.size / 2,
+                    backgroundColor: C.primary,
+                    opacity: navRipples[index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [NAV_RIPPLE.fromOpacity, 0],
+                    }),
+                    transform: [
+                      {
+                        scale: navRipples[index].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [NAV_RIPPLE.fromScale, NAV_RIPPLE.toScale],
+                        }),
+                      },
+                    ],
+                  }}
+                />
                 <View style={[styles.navIcon, selected && styles.navIconSelected]}>
                   <Ionicons
                     name={selected ? tab.activeIcon : tab.icon}
