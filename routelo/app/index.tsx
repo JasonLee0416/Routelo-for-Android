@@ -142,6 +142,7 @@ import {
   VisionCameraPreviewProbe,
   visionCameraPreviewProbeEnabled,
 } from './platform/VisionCameraPreviewProbe';
+import { DARK, LIGHT, type Palette } from './theme/palette';
 
 type TabKey =
   | 'home'
@@ -152,90 +153,6 @@ type TabKey =
   | 'settings';
 type DeliveryFilter = 'all' | 'pending' | 'completed';
 type DeliverySort = 'deadline' | 'latest' | 'fee';
-
-export type Palette = {
-  primary: string;
-  primaryContainer: string;
-  onPrimaryContainer: string;
-  navy: string;
-  emphasis: string;
-  background: string;
-  surface: string;
-  surfaceRaised: string;
-  surfaceAlt: string;
-  outline: string;
-  outlineStrong: string;
-  text: string;
-  textMuted: string;
-  success: string;
-  successBg: string;
-  warning: string;
-  warningBg: string;
-  danger: string;
-  dangerBg: string;
-  glass: string;
-  glassStrong: string;
-  glassBorder: string;
-  glassHighlight: string;
-  navGlass: string;
-  shadow: string;
-};
-
-const LIGHT: Palette = {
-  primary: '#1E4FD8',
-  primaryContainer: '#E6EDFF',
-  onPrimaryContainer: '#0B2D6B',
-  navy: '#111827',
-  emphasis: '#14213D',
-  background: '#F5F7FA',
-  surface: '#FFFFFF',
-  surfaceRaised: '#FBFCFF',
-  surfaceAlt: '#EEF2F6',
-  outline: '#E2E8F0',
-  outlineStrong: '#CBD5E1',
-  text: '#111827',
-  textMuted: '#64748B',
-  success: '#16A34A',
-  successBg: '#E7F7EE',
-  warning: '#F59E0B',
-  warningBg: '#FFF7E8',
-  danger: '#E11D48',
-  dangerBg: '#FFE8EE',
-  glass: 'rgba(255,255,255,0.72)',
-  glassStrong: 'rgba(255,255,255,0.86)',
-  glassBorder: 'rgba(255,255,255,0.86)',
-  glassHighlight: 'rgba(255,255,255,0.96)',
-  navGlass: 'rgba(255,255,255,0.78)',
-  shadow: '#0F172A',
-};
-
-const DARK: Palette = {
-  primary: '#60A5FA',
-  primaryContainer: '#172C52',
-  onPrimaryContainer: '#DBEAFE',
-  navy: '#F9FAFB',
-  emphasis: '#0B1220',
-  background: '#080D17',
-  surface: '#111827',
-  surfaceRaised: '#182235',
-  surfaceAlt: '#1F2937',
-  outline: 'rgba(255,255,255,0.09)',
-  outlineStrong: 'rgba(255,255,255,0.18)',
-  text: '#F9FAFB',
-  textMuted: '#CBD5E1',
-  success: '#4ADE80',
-  successBg: '#123322',
-  warning: '#FBBF24',
-  warningBg: '#332613',
-  danger: '#FB7185',
-  dangerBg: '#351722',
-  glass: 'rgba(17,24,39,0.68)',
-  glassStrong: 'rgba(17,24,39,0.84)',
-  glassBorder: 'rgba(255,255,255,0.16)',
-  glassHighlight: 'rgba(255,255,255,0.20)',
-  navGlass: 'rgba(15,23,42,0.82)',
-  shadow: '#000000',
-};
 
 const C = LIGHT;
 
@@ -1042,7 +959,7 @@ function RouteScreen({
               <Text style={styles.secondaryButtonText}>배송 상세</Text>
             </Pressable>
             <Pressable style={styles.primaryButton} onPress={startNavigation}>
-              <Ionicons name="navigate-outline" size={18} color="#FFFFFF" />
+              <Ionicons name="navigate-outline" size={18} color={C.onPrimary} />
               <Text style={styles.primaryButtonText}>
                 {NAV_APP_LABEL[navApp]}(으)로 안내 시작
               </Text>
@@ -2317,7 +2234,7 @@ function OnboardingModal({
         <ScrollView contentContainerStyle={styles.onboardingContent}>
           <View style={styles.onboardingBrand}>
             <View style={styles.onboardingLogo}>
-              <Ionicons name="navigate" size={30} color="#FFFFFF" />
+              <Ionicons name="navigate" size={30} color={C.onPrimary} />
             </View>
             <Text style={styles.onboardingTitle}>RouteLO 시작하기</Text>
             <Text style={styles.onboardingSubtitle}>
@@ -2358,7 +2275,7 @@ function OnboardingModal({
                 value={displayName}
                 onChangeText={setDisplayName}
                 placeholder="기사님 이름 또는 닉네임"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={C.textMuted}
               />
               <TextInput
                 style={styles.onboardingInput}
@@ -2367,7 +2284,7 @@ function OnboardingModal({
                 autoCapitalize="none"
                 keyboardType="email-address"
                 placeholder="이메일"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={C.textMuted}
               />
               {!initial && (
                 <TextInput
@@ -2376,7 +2293,7 @@ function OnboardingModal({
                   onChangeText={setPassword}
                   secureTextEntry
                   placeholder="비밀번호 8자 이상"
-                  placeholderTextColor="#6B7280"
+                  placeholderTextColor={C.textMuted}
                 />
               )}
               <Text style={styles.onboardingSectionTitle}>업무 차량</Text>
@@ -2385,7 +2302,7 @@ function OnboardingModal({
                 value={vehicleModel}
                 onChangeText={setVehicleModel}
                 placeholder="차종 예: 현대 포터2"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={C.textMuted}
               />
               <View style={styles.energyRow}>
                 {(['gasoline', 'diesel', 'lpg', 'hybrid', 'electric'] as EnergyType[]).map(
@@ -2428,7 +2345,7 @@ function OnboardingModal({
                     ? '배터리 용량(kWh)'
                     : '연료탱크 용량(L)'
                 }
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={C.textMuted}
               />
               <Text style={styles.onboardingPrivacy}>
                 이 정보는 기사님의 배송 수익과 차량 운영비를 더 정확하게 분석하기
@@ -2555,7 +2472,7 @@ function DeliveryDetailSheet({
               <Ionicons
                 name={delivery.status === 'completed' ? 'refresh-outline' : 'checkmark'}
                 size={18}
-                color="#FFFFFF"
+                color={C.onPrimary}
               />
               <Text style={styles.primaryButtonText}>
                 {delivery.status === 'completed' ? '대기로 변경' : '배송 완료'}
@@ -2700,7 +2617,7 @@ function DeliveryDetailSheet({
                       disabled={!hasProofReason(reasonText)}
                       onPress={submitReason}
                     >
-                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                      <Ionicons name="checkmark" size={18} color={C.onPrimary} />
                       <Text style={styles.primaryButtonText}>기록</Text>
                     </Pressable>
                   </View>
@@ -3189,7 +3106,7 @@ function OcrScannerModal({
               <View style={[styles.captureCorner, styles.captureCornerBottomLeft]} />
               <View style={[styles.captureCorner, styles.captureCornerBottomRight]} />
               <View style={styles.documentPreview}>
-                <Ionicons name="document-text-outline" size={55} color="#89A7E8" />
+                <Ionicons name="document-text-outline" size={55} color={C.primary} />
                 <Text style={styles.documentPreviewTitle}>3개 필드를 찾을 때까지 스캔합니다</Text>
                 <Text style={styles.documentPreviewCaption}>
                   상호명, 주소, 전화번호가 안정적으로 잠기면 검토 화면으로 이동합니다.
@@ -3221,7 +3138,7 @@ function OcrScannerModal({
               </View>
             </View>
             <Pressable style={styles.scanPrimaryButton} onPress={() => selectImage(true)}>
-              <Ionicons name="camera" size={21} color="#FFFFFF" />
+              <Ionicons name="camera" size={21} color={C.onPrimary} />
               <Text style={styles.scanPrimaryButtonText}>
                 {liveSummary.primaryCaptureLabel}
               </Text>
@@ -3285,7 +3202,7 @@ function OcrScannerModal({
               </Pressable>
               <Pressable style={styles.scanPrimaryFlex} onPress={analyze}>
                 <Text style={styles.scanPrimaryButtonText}>이 프레임 누적</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                <Ionicons name="arrow-forward" size={18} color={C.onPrimary} />
               </Pressable>
             </View>
           </ScrollView>
@@ -3307,7 +3224,7 @@ function OcrScannerModal({
                     <Ionicons
                       name={index < 2 ? 'checkmark' : 'ellipsis-horizontal'}
                       size={15}
-                      color={index < 2 ? '#FFFFFF' : C.textMuted}
+                      color={index < 2 ? C.onPrimary : C.textMuted}
                     />
                   </View>
                   <Text style={styles.processingStepText}>{item}</Text>
@@ -3466,7 +3383,7 @@ function OcrScannerModal({
                 </Text>
               </View>
               <Pressable style={styles.scanPrimaryButton} onPress={register}>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                <Ionicons name="checkmark-circle-outline" size={20} color={C.onPrimary} />
                 <Text style={styles.scanPrimaryButtonText}>검수 완료 · 배달 목록에 등록</Text>
               </Pressable>
               <Pressable style={styles.scanSecondaryButton} onPress={reset}>
@@ -3884,7 +3801,7 @@ export default function RouteloApp() {
         style={[styles.scanFab, { bottom: 98 + insets.bottom }]}
         onPress={() => setScannerVisible(true)}
       >
-        <Ionicons name="scan-outline" size={23} color="#FFFFFF" />
+        <Ionicons name="scan-outline" size={23} color={C.onPrimary} />
         <Text style={styles.scanFabText}>인수증 스캔</Text>
       </Pressable>
       <View
@@ -4157,7 +4074,7 @@ const makeStyles = (C: Palette) =>
   },
   calendarDaySelected: { backgroundColor: C.primaryContainer },
   calendarDayText: { color: C.text, fontWeight: '700' },
-  calendarDayOutside: { color: '#B7C0CE' },
+  calendarDayOutside: { color: C.textMuted },
   calendarDayTextSelected: { color: C.onPrimaryContainer },
   calendarCount: {
     minWidth: 18,
@@ -4169,7 +4086,7 @@ const makeStyles = (C: Palette) =>
     justifyContent: 'center',
   },
   calendarCountUrgent: { backgroundColor: C.danger },
-  calendarCountText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  calendarCountText: { color: C.onPrimary, fontSize: 10, fontWeight: '800' },
   calendarMoneyStack: {
     width: '100%',
     paddingHorizontal: 2,
@@ -4433,7 +4350,7 @@ const makeStyles = (C: Palette) =>
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notificationCounterText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
+  notificationCounterText: { color: C.onPrimary, fontSize: 9, fontWeight: '800' },
   sectionHeader: {
     marginTop: 24,
     marginBottom: 11,
@@ -4475,19 +4392,19 @@ const makeStyles = (C: Palette) =>
     backgroundColor: C.emphasis,
   },
   progressTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  progressLabel: { color: '#BFCBE0', fontSize: 11, fontWeight: '600' },
-  progressValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', marginTop: 3 },
+  progressLabel: { color: C.onEmphasisMuted, fontSize: 11, fontWeight: '600' },
+  progressValue: { color: C.onEmphasis, fontSize: 28, fontWeight: '800', marginTop: 3 },
   progressSummary: { alignItems: 'flex-end' },
-  progressSummaryValue: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
-  progressSummaryLabel: { color: '#9EADC7', fontSize: 9, marginTop: 2 },
+  progressSummaryValue: { color: C.onEmphasis, fontSize: 17, fontWeight: '800' },
+  progressSummaryLabel: { color: C.onEmphasisMuted, fontSize: 9, marginTop: 2 },
   progressTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#35445F',
+    backgroundColor: C.surfaceAlt,
     marginTop: 15,
     overflow: 'hidden',
   },
-  progressFill: { height: '100%', borderRadius: 4, backgroundColor: '#7FA7FF' },
+  progressFill: { height: '100%', borderRadius: 4, backgroundColor: C.primary },
   progressMeta: { flexDirection: 'row', gap: 18, marginTop: 13 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metaText: { color: C.textMuted, fontSize: 10, fontWeight: '600' },
@@ -4536,7 +4453,7 @@ const makeStyles = (C: Palette) =>
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sequenceMarkerText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  sequenceMarkerText: { color: C.onPrimary, fontSize: 13, fontWeight: '800' },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   compactTime: { color: C.primary, fontSize: 11, fontWeight: '800' },
   compactTitle: { color: C.text, fontSize: 14, fontWeight: '800', marginTop: 5 },
@@ -4674,19 +4591,19 @@ const makeStyles = (C: Palette) =>
   deliveryCardFooter: { marginTop: 13, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.outline, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   outlinedButton: { minHeight: 40, paddingHorizontal: 13, borderRadius: 16, borderWidth: 1, borderColor: C.outlineStrong, backgroundColor: C.glass, flexDirection: 'row', alignItems: 'center', gap: 4 },
   outlinedButtonText: { color: C.primary, fontSize: 10, fontWeight: '800' },
-  mapCard: { height: 315, borderRadius: 24, backgroundColor: '#E8EDF0', borderWidth: 1, borderColor: C.outline, overflow: 'hidden' },
-  mapRoad: { position: 'absolute', backgroundColor: '#FFFFFF', borderColor: '#D7DEE4', borderWidth: 1, borderRadius: 20 },
+  mapCard: { height: 315, borderRadius: 24, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.outline, overflow: 'hidden' },
+  mapRoad: { position: 'absolute', backgroundColor: C.surface, borderColor: C.outline, borderWidth: 1, borderRadius: 20 },
   mapRoadOne: { width: '120%', height: 25, left: '-10%', top: '52%', transform: [{ rotate: '-16deg' }] },
   mapRoadTwo: { width: 24, height: '120%', left: '54%', top: '-10%', transform: [{ rotate: '18deg' }] },
   mapRoadThree: { width: '70%', height: 15, left: '15%', top: '26%', transform: [{ rotate: '8deg' }] },
-  mapPark: { position: 'absolute', width: 130, height: 90, borderRadius: 50, backgroundColor: '#D8E7D7', left: -30, bottom: 10 },
+  mapPark: { position: 'absolute', width: 130, height: 90, borderRadius: 50, backgroundColor: C.successBg, left: -30, bottom: 10 },
   routeLineVisual: { position: 'absolute', height: 5, borderRadius: 3, backgroundColor: C.primary },
-  routeArrow: { position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: C.primary, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  currentLocation: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: '#BBD0FF', alignItems: 'center', justifyContent: 'center' },
-  currentLocationInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.primary, borderWidth: 2, borderColor: '#FFFFFF' },
-  mapPin: { position: 'absolute', width: 36, height: 36, borderRadius: 18, backgroundColor: C.primary, borderWidth: 3, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  mapPinText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
-  mapLegend: { position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  routeArrow: { position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: C.primary, borderWidth: 2, borderColor: C.onPrimary, alignItems: 'center', justifyContent: 'center' },
+  currentLocation: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center' },
+  currentLocationInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.primary, borderWidth: 2, borderColor: C.onPrimary },
+  mapPin: { position: 'absolute', width: 36, height: 36, borderRadius: 18, backgroundColor: C.primary, borderWidth: 3, borderColor: C.onPrimary, alignItems: 'center', justifyContent: 'center' },
+  mapPinText: { color: C.onPrimary, fontSize: 13, fontWeight: '900' },
+  mapLegend: { position: 'absolute', left: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.surface, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
   googleDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.primary },
   mapLegendText: { color: C.text, fontSize: 9, fontWeight: '700' },
   nextDestinationCard: { marginTop: 11, padding: 17, borderRadius: 22, backgroundColor: C.surface, borderWidth: 1, borderColor: C.outline },
@@ -4718,15 +4635,15 @@ const makeStyles = (C: Palette) =>
   navAppOptionText: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
   navAppOptionTextActive: { color: C.primary, fontWeight: '800' },
   primaryButton: { flex: 1, minHeight: 50, borderRadius: 18, backgroundColor: C.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, shadowColor: C.primary, shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  primaryButtonText: { color: C.onPrimary, fontSize: 12, fontWeight: '800' },
   secondaryButton: { flex: 1, minHeight: 50, borderRadius: 18, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12 },
   secondaryButtonText: { color: C.primary, fontSize: 12, fontWeight: '800' },
   notificationSummary: { minHeight: 95, borderRadius: 22, padding: 17, backgroundColor: C.emphasis, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  notificationSummaryLabel: { color: '#BFCBE0', fontSize: 10 },
-  notificationSummaryValue: { color: '#FFFFFF', fontSize: 25, fontWeight: '800', marginTop: 5 },
+  notificationSummaryLabel: { color: C.onEmphasisMuted, fontSize: 10 },
+  notificationSummaryValue: { color: C.onEmphasis, fontSize: 25, fontWeight: '800', marginTop: 5 },
   urgencyLegend: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 7, height: 7, borderRadius: 4, marginLeft: 6 },
-  legendText: { color: '#D2DBEB', fontSize: 9 },
+  legendText: { color: C.onEmphasisMuted, fontSize: 9 },
   notificationList: { gap: 9 },
   notificationCard: { minHeight: 116, padding: 15, borderRadius: 24, backgroundColor: C.surfaceRaised, borderWidth: 1, borderColor: C.outline, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   notificationIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -4735,9 +4652,9 @@ const makeStyles = (C: Palette) =>
   notificationTitle: { color: C.text, fontSize: 14, fontWeight: '800', marginTop: 7 },
   notificationBody: { color: C.textMuted, fontSize: 10, lineHeight: 16, marginTop: 5 },
   profileCard: { minHeight: 88, padding: 15, borderRadius: 22, backgroundColor: C.emphasis, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  profileAvatar: { width: 50, height: 50, borderRadius: 17, backgroundColor: '#E5ECFF', alignItems: 'center', justifyContent: 'center' },
-  profileName: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-  profileCaption: { color: '#AEBBD1', fontSize: 10, marginTop: 4 },
+  profileAvatar: { width: 50, height: 50, borderRadius: 17, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center' },
+  profileName: { color: C.onEmphasis, fontSize: 15, fontWeight: '800' },
+  profileCaption: { color: C.onEmphasisMuted, fontSize: 10, marginTop: 4 },
   iconButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center' },
   settingsGroup: { borderRadius: 26, backgroundColor: C.surfaceRaised, borderWidth: 1, borderColor: C.outline, overflow: 'hidden' },
   districtFeePanel: {
@@ -4807,7 +4724,7 @@ const makeStyles = (C: Palette) =>
   settingIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center' },
   settingTitle: { color: C.text, fontSize: 13, fontWeight: '800' },
   settingCaption: { color: C.textMuted, fontSize: 11, marginTop: 4, lineHeight: 16 },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(8,13,23,0.56)' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: C.emphasis },
   bottomSheet: { paddingHorizontal: 20, paddingBottom: 28, borderTopLeftRadius: 34, borderTopRightRadius: 34, backgroundColor: C.glassStrong, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.glassBorder },
   sheetHandle: { width: 46, height: 5, borderRadius: 3, backgroundColor: C.outlineStrong, alignSelf: 'center', marginTop: 10, marginBottom: 18 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 },
@@ -4865,7 +4782,7 @@ const makeStyles = (C: Palette) =>
     elevation: 14,
     zIndex: 20,
   },
-  scanFabText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  scanFabText: { color: C.onPrimary, fontSize: 12, fontWeight: '800' },
   scannerApp: { flex: 1, backgroundColor: C.background },
   scannerHeader: {
     minHeight: 78,
@@ -4923,7 +4840,7 @@ const makeStyles = (C: Palette) =>
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: C.surface,
   },
   autoCaptureDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.success },
   autoCaptureText: { color: C.textMuted, fontSize: 9, fontWeight: '700' },
@@ -5001,13 +4918,13 @@ const makeStyles = (C: Palette) =>
     gap: 8,
     marginTop: 15,
   },
-  scanPrimaryButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  scanPrimaryButtonText: { color: C.onPrimary, fontSize: 12, fontWeight: '800' },
   scanSecondaryButton: {
     minHeight: 52,
     borderRadius: 17,
     backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: '#AFC2EB',
+    borderColor: C.outline,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -5034,7 +4951,7 @@ const makeStyles = (C: Palette) =>
     bottom: 22,
     borderRadius: 12,
     borderWidth: 3,
-    borderColor: '#73A0FF',
+    borderColor: C.primary,
   },
   qualityScoreCircle: {
     position: 'absolute',
@@ -5043,7 +4960,7 @@ const makeStyles = (C: Palette) =>
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: C.surface,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -5092,7 +5009,7 @@ const makeStyles = (C: Palette) =>
     minHeight: 52,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: '#AFC2EB',
+    borderColor: C.outline,
     backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -5132,10 +5049,10 @@ const makeStyles = (C: Palette) =>
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  ocrSummaryLabel: { color: '#BFCBE0', fontSize: 10, fontWeight: '600' },
-  ocrSummaryValue: { color: '#FFFFFF', fontSize: 29, fontWeight: '900', marginTop: 5 },
+  ocrSummaryLabel: { color: C.onEmphasisMuted, fontSize: 10, fontWeight: '600' },
+  ocrSummaryValue: { color: C.onEmphasis, fontSize: 29, fontWeight: '900', marginTop: 5 },
   ocrSummaryMeta: { alignItems: 'flex-end', gap: 5 },
-  ocrSummaryMetaText: { color: '#C7D3E8', fontSize: 9 },
+  ocrSummaryMetaText: { color: C.onEmphasisMuted, fontSize: 9 },
   reviewGuide: {
     marginTop: 10,
     padding: 12,
