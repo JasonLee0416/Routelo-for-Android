@@ -19,7 +19,7 @@ type ImageAssetInfo = {
 };
 
 type RecognizedText = {
-  engine?: 'ppocrv5';
+  engine?: OcrPipelineResult['engine'];
   modelVersion?: string;
   fullText: string;
   processingMs: number;
@@ -50,9 +50,11 @@ export class OcrRecognizerUnavailableError extends Error {
 }
 
 export class OcrNoTextDetectedError extends Error {
-  constructor() {
+  constructor(
+    message = '사진에서 인식 가능한 글자를 찾지 못했습니다. 인수증 전체가 선명하게 보이도록 다시 촬영해 주세요.',
+  ) {
     super(
-      '사진에서 인식 가능한 글자를 찾지 못했습니다. 인수증 전체가 선명하게 보이도록 다시 촬영해 주세요.',
+      message,
     );
     this.name = 'OcrNoTextDetectedError';
   }
@@ -166,6 +168,57 @@ function field(
     alternatives,
     status,
   };
+}
+
+const RECEIPT_EVIDENCE_PATTERNS = [
+  /(?:발주|배송|배달|수령|인수|받는\s*분|주문|상품|화환|리본|요청|메모|비고|예식|행사|엄수|주소|전화|연락처)/u,
+  /(?:서울|경기|인천|부산|대구|대전|광주|울산|세종|제주)\s*[가-힣0-9\s]*(?:시|군|구|동|로|길)/u,
+  /(?:01[016789]|02|0[3-6]\d)[-\s]?\d{3,4}[-\s]?\d{4}/,
+  /20\d{2}[.\-/년\s]\s*\d{1,2}[.\-/월\s]\s*\d{1,2}/,
+  /(?:오전|오후)?\s*\d{1,2}\s*(?::|시)\s*\d{0,2}\s*(?:분|까지)?/u,
+];
+
+const CORE_EVIDENCE_KEYS = new Set<OcrFieldKey>([
+  'orderingVendorName',
+  'orderingVendorTel',
+  'fulfillingVendorName',
+  'fulfillingVendorTel',
+  'productName',
+  'deliveryDate',
+  'deliveryAddress',
+  'recipientName',
+  'recipientTel',
+]);
+
+function receiptEvidenceScore(rawText: string) {
+  const compactText = rawText.normalize('NFKC').replace(/\s+/g, ' ').trim();
+  if (!compactText) return 0;
+  return RECEIPT_EVIDENCE_PATTERNS.reduce(
+    (score, pattern) => score + (pattern.test(compactText) ? 1 : 0),
+    0,
+  );
+}
+
+function usableCoreFieldCount(fields: OcrFieldResult[]) {
+  return fields.filter(
+    (fieldResult) =>
+      CORE_EVIDENCE_KEYS.has(fieldResult.key) &&
+      fieldResult.value.trim() &&
+      fieldResult.confidence >= 70 &&
+      fieldResult.status !== 'warning',
+  ).length;
+}
+
+function assertUsefulOcrEvidence(
+  rawText: string,
+  parsed: OcrPipelineResult,
+) {
+  const evidenceScore = receiptEvidenceScore(rawText);
+  const coreFieldCount = usableCoreFieldCount(parsed.fields);
+  if (evidenceScore >= 2 || coreFieldCount >= 2) return;
+  throw new OcrNoTextDetectedError(
+    'OCR이 인수증 핵심 근거를 충분히 찾지 못했습니다. 상호명, 주소, 전화번호 중 최소 2개 이상의 근거가 잡히기 전에는 자동 등록하지 않습니다.',
+  );
 }
 
 const compactLabel = (value: string) =>
@@ -754,10 +807,15 @@ export async function runReceiptOcr(
       recognized.lines || [],
       recognized.fullText,
     );
-    const parsed = parseReceiptText(layoutText, quality);
+    const textForParsing =
+      receiptEvidenceScore(layoutText) >= receiptEvidenceScore(recognized.fullText)
+        ? layoutText
+        : recognized.fullText;
+    const parsed = parseReceiptText(textForParsing, quality);
+    assertUsefulOcrEvidence(textForParsing, parsed);
     return enrichOcrPipelineResult({
       ...parsed,
-      engine: 'ppocrv5',
+      engine: recognized.engine || 'ppocrv5',
       modelVersion: recognized.modelVersion,
       recognizedLines: recognized.lines,
       processingMs: recognized.processingMs,
@@ -767,7 +825,7 @@ export async function runReceiptOcr(
     if (error instanceof OcrNoTextDetectedError) throw error;
     throw new OcrRecognizerUnavailableError(
       error instanceof Error
-        ? `PP-OCR 실행에 실패했습니다: ${error.message}`
+        ? `OCR 엔진 실행에 실패했습니다: ${error.message}`
         : undefined,
     );
   }

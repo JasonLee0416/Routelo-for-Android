@@ -125,6 +125,7 @@ import {
   OcrRecognizerUnavailableError,
   runReceiptOcr,
 } from './services/ocr';
+import { prepareReceiptImageForOcr } from './services/ocrImagePreparation';
 import {
   createInitialLiveOcrSession,
   liveOcrChecklistItems,
@@ -2932,6 +2933,7 @@ function OcrScannerModal({
   const { C, styles } = useTheme();
   const [stage, setStage] = useState<ScanStage>('capture');
   const [imageUri, setImageUri] = useState<string>();
+  const [ocrImageUri, setOcrImageUri] = useState<string>();
   const [assetInfo, setAssetInfo] = useState<{ width?: number; height?: number; fileSize?: number }>({});
   const [result, setResult] = useState<OcrPipelineResult>();
   const [aggregateResult, setAggregateResult] = useState<OcrPipelineResult>();
@@ -2947,6 +2949,7 @@ function OcrScannerModal({
   const reset = () => {
     setStage('capture');
     setImageUri(undefined);
+    setOcrImageUri(undefined);
     setAssetInfo({});
     setResult(undefined);
     setAggregateResult(undefined);
@@ -2993,15 +2996,35 @@ function OcrScannerModal({
         });
     if (picked.canceled) return;
     const asset = picked.assets[0];
-    const info = { width: asset.width, height: asset.height, fileSize: asset.fileSize };
+    const prepared = await prepareReceiptImageForOcr({
+      uri: asset.uri,
+      width: asset.width,
+      height: asset.height,
+      fileSize: asset.fileSize,
+    });
+    const info = {
+      width: prepared.width,
+      height: prepared.height,
+      fileSize: prepared.fileSize,
+    };
     setImageUri(asset.uri);
+    setOcrImageUri(prepared.uri);
     setAssetInfo(info);
+    const preparedQuality = inspectCaptureQuality(info);
     setResult({
       engine: 'fixture',
       rawText: '',
       fields: [],
       documentConfidence: 0,
-      quality: inspectCaptureQuality(info),
+      quality: {
+        ...preparedQuality,
+        messages: [
+          ...new Set([
+            ...preparedQuality.messages,
+            ...prepared.preparationMessages,
+          ]),
+        ],
+      },
       processingMs: 0,
       variantsCompared: 0,
       unmapped: [],
@@ -3030,7 +3053,7 @@ function OcrScannerModal({
     setStageAnimated('processing');
     setVendorCheck(undefined);
     try {
-      const next = await runReceiptOcr({ ...assetInfo, uri: imageUri });
+      const next = await runReceiptOcr({ ...assetInfo, uri: ocrImageUri || imageUri });
       const merged = mergeOcrResult(aggregateResult, next);
       const nextSession = updateLiveOcrSession(liveSession, next);
       setAggregateResult(merged);

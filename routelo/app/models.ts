@@ -112,7 +112,7 @@ export type CaptureQuality = {
 };
 
 export type OcrPipelineResult = {
-  engine: 'ppocrv5' | 'clova' | 'fixture';
+  engine: 'ppocrv5' | 'mlkit-v2-korean' | 'clova' | 'fixture';
   modelVersion?: string;
   rawText: string;
   recognizedLines?: Array<{
