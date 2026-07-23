@@ -38,7 +38,8 @@
       "onnxruntime-react-native",
       "./plugins/withAndroidPpocrFrameRecognizer",
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-asset"
     ]
   }
 }

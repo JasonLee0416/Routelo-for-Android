@@ -16,6 +16,7 @@ on:
         options:
           - stable-mobile
           - high-res-preprocess
+          - ocr-recovery-test
       apk_kind:
         description: "APK kind to build"
         required: false

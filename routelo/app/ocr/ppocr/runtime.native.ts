@@ -137,6 +137,7 @@ export async function recognizeReceiptWithPpOcr(
       mapHeight,
       detectorImage.sourceWidth,
       detectorImage.sourceHeight,
+      profile.dbPostprocess,
     );
 
     const lines: PpOcrLine[] = [];
