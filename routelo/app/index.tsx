@@ -120,12 +120,14 @@ import {
   verifyVendor,
 } from './vendor';
 import {
-  inspectCaptureQuality,
   OcrNoTextDetectedError,
   OcrRecognizerUnavailableError,
   runReceiptOcr,
 } from './services/ocr';
-import { prepareReceiptImageForOcr } from './services/ocrImagePreparation';
+import {
+  inspectReceiptImageQuality,
+  prepareReceiptImageForOcr,
+} from './services/ocrImagePreparation';
 import {
   createInitialLiveOcrSession,
   liveOcrChecklistItems,
@@ -2855,6 +2857,7 @@ function OcrScannerModal({
   const [result, setResult] = useState<OcrPipelineResult>();
   const [aggregateResult, setAggregateResult] = useState<OcrPipelineResult>();
   const [fields, setFields] = useState<OcrFieldResult[]>([]);
+  const [ocrErrorMessage, setOcrErrorMessage] = useState<string>();
   const [vendorCheck, setVendorCheck] = useState<VendorVerification>();
   const [addressVerification, setAddressVerification] =
     useState<AddressVerificationResult>();
@@ -2871,6 +2874,7 @@ function OcrScannerModal({
     setResult(undefined);
     setAggregateResult(undefined);
     setFields([]);
+    setOcrErrorMessage(undefined);
     setVendorCheck(undefined);
     setAddressVerification(undefined);
     setLiveSession(createInitialLiveOcrSession());
@@ -2927,7 +2931,11 @@ function OcrScannerModal({
     setImageUri(asset.uri);
     setOcrImageUri(prepared.uri);
     setAssetInfo(info);
-    const preparedQuality = inspectCaptureQuality(info);
+    setOcrErrorMessage(undefined);
+    const preparedQuality = await inspectReceiptImageQuality({
+      ...info,
+      uri: prepared.uri,
+    });
     setResult({
       engine: 'fixture',
       rawText: '',
@@ -2969,8 +2977,14 @@ function OcrScannerModal({
     }
     setStageAnimated('processing');
     setVendorCheck(undefined);
+    setOcrErrorMessage(undefined);
     try {
-      const next = await runReceiptOcr({ ...assetInfo, uri: ocrImageUri || imageUri });
+      const next = await runReceiptOcr(
+        { ...assetInfo, uri: ocrImageUri || imageUri },
+        undefined,
+        undefined,
+        result?.quality,
+      );
       const merged = mergeOcrResult(aggregateResult, next);
       const nextSession = updateLiveOcrSession(liveSession, next);
       setAggregateResult(merged);
@@ -2988,14 +3002,17 @@ function OcrScannerModal({
         );
       }
     } catch (error) {
+      const message =
+        error instanceof OcrRecognizerUnavailableError || error instanceof OcrNoTextDetectedError
+          ? error.message
+          : '인수증을 분석하지 못했습니다. 다시 촬영해 주세요.';
       setResult(aggregateResult);
       setFields(aggregateResult?.fields ?? []);
       setStageAnimated('capture');
+      setOcrErrorMessage(message);
       Alert.alert(
         'OCR 인식 준비 중',
-        error instanceof OcrRecognizerUnavailableError || error instanceof OcrNoTextDetectedError
-          ? error.message
-          : '인수증을 분석하지 못했습니다. 다시 촬영해 주세요.',
+        message,
       );
     }
   };
@@ -3120,6 +3137,15 @@ function OcrScannerModal({
               </View>
             </View>
             <LiveScanChecklist session={liveSession} />
+            {ocrErrorMessage ? (
+              <View style={styles.ocrDiagnosticCard}>
+                <Ionicons name="bug-outline" size={19} color={C.warning} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ocrDiagnosticTitle}>직전 OCR 실패 진단</Text>
+                  <Text style={styles.ocrDiagnosticText}>{ocrErrorMessage}</Text>
+                </View>
+              </View>
+            ) : null}
             {visionCameraPreviewProbeEnabled() ? (
               <VisionCameraPreviewProbe isActive={visible && stage === 'capture'} />
             ) : null}
@@ -3171,7 +3197,12 @@ function OcrScannerModal({
             </View>
             <View style={styles.qualityCard}>
               <View style={styles.qualityCardHeader}>
-                <Text style={styles.qualityCardTitle}>프레임 품질 분석</Text>
+                <View>
+                  <Text style={styles.qualityCardTitle}>프레임 품질 분석</Text>
+                  <Text style={styles.qualityMeasuredText}>
+                    {quality.measured ? '실제 이미지 픽셀 기반 측정' : '이미지 분석 실패 · 추정값'}
+                  </Text>
+                </View>
                 <View style={[styles.badge, quality.passed ? styles.successBadge : styles.waitBadge]}>
                   <Text style={[styles.badgeText, { color: quality.passed ? C.success : C.warning }]}>
                     {quality.passed ? 'OCR 진행 가능' : '재촬영 권장'}
@@ -3183,6 +3214,11 @@ function OcrScannerModal({
               <QualityMeter label="문서 영역" value={quality.documentCoverage} icon="scan-outline" />
               <QualityMeter label="기울기" value={quality.skew} icon="move-outline" />
               <QualityMeter label="그림자" value={quality.shadow} icon="contrast-outline" />
+              {quality.metrics ? (
+                <Text style={styles.qualityMetricText}>
+                  sharp={quality.metrics.sharpnessVariance ?? '-'} · lum={quality.metrics.luminanceMean ?? '-'} · paper={quality.metrics.paperPixelRatio ?? '-'} · box={quality.metrics.documentBoxRatio ?? '-'}
+                </Text>
+              ) : null}
             </View>
             {quality.messages.map((message) => (
               <View key={message} style={styles.qualityWarning}>
@@ -3190,6 +3226,17 @@ function OcrScannerModal({
                 <Text style={styles.qualityWarningText}>{message}</Text>
               </View>
             ))}
+            {result?.ocrDiagnostics ? (
+              <View style={styles.ocrDiagnosticCard}>
+                <Ionicons name="analytics-outline" size={19} color={C.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ocrDiagnosticTitle}>OCR 엔진 진단</Text>
+                  <Text style={styles.ocrDiagnosticText}>
+                    profile={result.ocrDiagnostics.preprocessProfileId ?? '-'} · regions={result.ocrDiagnostics.regionCount ?? 0} · lines={result.ocrDiagnostics.acceptedLineCount ?? 0} · text={result.ocrDiagnostics.rawTextLength ?? 0}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             <View style={styles.variantInfo}>
               <Ionicons name="layers-outline" size={20} color={C.primary} />
               <Text style={styles.variantInfoText}>
@@ -3246,11 +3293,18 @@ function OcrScannerModal({
                   <Text style={styles.ocrSummaryMetaText}>
                     {result.engine === 'ppocrv5'
                       ? `PP-OCRv5 온디바이스 OCR${result.modelVersion ? ` · ${result.modelVersion}` : ''}`
-                      : '명시적 테스트 샘플'}
+                      : result.engine === 'mlkit-v2-korean'
+                        ? `Android Korean Text OCR${result.modelVersion ? ` · ${result.modelVersion}` : ''}`
+                        : '명시적 테스트 샘플'}
                   </Text>
                   <Text style={styles.ocrSummaryMetaText}>
                     {liveSession.acceptedFrameCount}개 프레임 누적 · {result.processingMs}ms
                   </Text>
+                  {result.ocrDiagnostics ? (
+                    <Text style={styles.ocrSummaryMetaText}>
+                      regions {result.ocrDiagnostics.regionCount ?? 0} · lines {result.ocrDiagnostics.acceptedLineCount ?? 0} · text {result.ocrDiagnostics.rawTextLength ?? 0}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
               {result.cloudFallback?.trigger && (
@@ -4977,6 +5031,14 @@ const makeStyles = (C: Palette) =>
   },
   qualityCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   qualityCardTitle: { color: C.text, fontSize: 15, fontWeight: '800' },
+  qualityMeasuredText: { color: C.textMuted, fontSize: 9, fontWeight: '700', marginTop: 3 },
+  qualityMetricText: {
+    color: C.textMuted,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 14,
+    marginTop: 8,
+  },
   qualityRow: { minHeight: 37, flexDirection: 'row', alignItems: 'center', gap: 9 },
   qualityLabelGroup: { width: 78, flexDirection: 'row', alignItems: 'center', gap: 6 },
   qualityLabel: { color: C.textMuted, fontSize: 11, fontWeight: '700' },
@@ -4993,6 +5055,19 @@ const makeStyles = (C: Palette) =>
     gap: 8,
   },
   qualityWarningText: { flex: 1, color: C.warning, fontSize: 10, fontWeight: '700' },
+  ocrDiagnosticCard: {
+    marginTop: 12,
+    padding: 13,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.warning,
+    backgroundColor: C.warningBg,
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  ocrDiagnosticTitle: { color: C.text, fontSize: 11, fontWeight: '900', marginBottom: 4 },
+  ocrDiagnosticText: { color: C.textMuted, fontSize: 10, fontWeight: '700', lineHeight: 15 },
   variantInfo: {
     padding: 13,
     marginTop: 10,

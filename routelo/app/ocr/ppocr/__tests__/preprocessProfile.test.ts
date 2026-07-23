@@ -44,6 +44,27 @@ describe('PP-OCR preprocess profiles', () => {
     });
   });
 
+  it('selects an aggressive OCR recovery profile for test APK builds', () => {
+    expect(
+      selectPpOcrPreprocessProfile({
+        EXPO_PUBLIC_ROUTELO_OCR_PROFILE: 'ocr-recovery-test',
+      }),
+    ).toMatchObject({
+      id: 'ocr-recovery-test',
+      detectorMaxSide: 1920,
+      recognizerTargetWidth: 640,
+      minLineConfidence: 0.22,
+      dbPostprocess: {
+        threshold: 0.18,
+        boxThreshold: 0.22,
+        minArea: 5,
+        unclipRatio: 2.15,
+        maxRegions: 192,
+      },
+      tensor: { illuminationNormalization: true },
+    });
+  });
+
   it('changes low-contrast tensor values only for the guarded preprocessing path', () => {
     const dark = image(42);
     const stableDetector = detectorTensorData(
@@ -64,9 +85,15 @@ describe('PP-OCR preprocess profiles', () => {
       PP_OCR_PREPROCESS_PROFILES.highResPreprocess.recognizerTargetWidth,
       PP_OCR_PREPROCESS_PROFILES.highResPreprocess.tensor,
     );
+    const recoveryRecognizer = recognizerTensorData(
+      dark,
+      PP_OCR_PREPROCESS_PROFILES.ocrRecoveryTest.recognizerTargetWidth,
+      PP_OCR_PREPROCESS_PROFILES.ocrRecoveryTest.tensor,
+    );
 
     expect(guardedDetector[0]).not.toBeCloseTo(stableDetector[0]);
     expect(guardedRecognizer[0]).not.toBeCloseTo(stableRecognizer[0]);
     expect(guardedRecognizer.length).toBe(480 * dark.height * 3);
+    expect(recoveryRecognizer.length).toBe(640 * dark.height * 3);
   });
 });

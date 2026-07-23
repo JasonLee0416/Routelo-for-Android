@@ -19,6 +19,7 @@ import {
   PP_OCR_ORIENTATION_CANDIDATES,
   PpOcrOrientation,
   PpOcrOrientationCandidate,
+  scoreOrientationCandidate,
 } from './orientation';
 import type { PpOcrLine, PpOcrResult } from './types';
 
@@ -137,6 +138,7 @@ export async function recognizeReceiptWithPpOcr(
       mapHeight,
       detectorImage.sourceWidth,
       detectorImage.sourceHeight,
+      profile.dbPostprocess,
     );
 
     const lines: PpOcrLine[] = [];
@@ -197,15 +199,34 @@ export async function recognizeReceiptWithPpOcr(
     }
   }
   const best = chooseBestOrientationCandidate(candidates);
+  const fullText = best.lines.map(({ text }) => text).join('\n');
 
   return {
     engine: 'ppocrv5',
     modelVersion: PP_OCR_MODEL_VERSION,
-    fullText: best.lines.map(({ text }) => text).join('\n'),
+    fullText,
     lines: best.lines,
     processingMs: Date.now() - startedAt,
     orientationDegrees: best.orientation,
     variantsCompared: candidates.length,
     preprocessProfileId: profile.id,
+    diagnostics: {
+      preprocessProfileId: profile.id,
+      selectedOrientationDegrees: best.orientation,
+      regionCount: best.regions.length,
+      acceptedLineCount: best.lines.length,
+      rawTextLength: fullText.length,
+      orientationCandidates: candidates.map((candidate) => {
+        const score = scoreOrientationCandidate(candidate);
+        return {
+          orientation: candidate.orientation,
+          regionCount: candidate.regions.length,
+          acceptedLineCount: candidate.lines.length,
+          averageLineConfidence: score.averageConfidence,
+          meaningfulTextLength: score.meaningfulTextLength,
+          processingMs: candidate.processingMs,
+        };
+      }),
+    },
   };
 }

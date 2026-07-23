@@ -25,6 +25,7 @@ type RecognizedText = {
   processingMs: number;
   orientationDegrees?: 0 | 90 | 180 | 270;
   variantsCompared?: number;
+  diagnostics?: OcrPipelineResult['ocrDiagnostics'];
   lines?: Array<{
     text: string;
     boundingBox?: {
@@ -785,8 +786,9 @@ export async function runReceiptOcr(
   asset: ImageAssetInfo,
   rawText?: string,
   recognizeImage?: RecognizeImage,
+  qualityOverride?: CaptureQuality,
 ): Promise<OcrPipelineResult> {
-  const quality = inspectCaptureQuality(asset);
+  const quality = qualityOverride || inspectCaptureQuality(asset);
   if (rawText?.trim()) {
     return parseReceiptText(rawText, quality);
   }
@@ -800,9 +802,24 @@ export async function runReceiptOcr(
       (async (imageUri: string) => {
         const { recognizeReceiptWithPpOcr } = await import('./recognizer');
         return recognizeReceiptWithPpOcr(imageUri);
-      });
+    });
     const recognized = await recognize(asset.uri);
-    if (!recognized.fullText.trim()) throw new OcrNoTextDetectedError();
+    if (!recognized.fullText.trim()) {
+      const regionCount = recognized.diagnostics?.regionCount;
+      const acceptedLineCount = recognized.diagnostics?.acceptedLineCount;
+      const profile = recognized.diagnostics?.preprocessProfileId;
+      throw new OcrNoTextDetectedError(
+        [
+          'OCR 엔진이 읽을 수 있는 한글 텍스트를 만들지 못했습니다.',
+          profile ? `profile=${profile}` : undefined,
+          typeof regionCount === 'number' ? `detectedRegions=${regionCount}` : undefined,
+          typeof acceptedLineCount === 'number' ? `acceptedLines=${acceptedLineCount}` : undefined,
+          '카메라 품질, DB text detector, recognizer/CTC 중 어느 단계가 실패했는지 진단값을 확인해야 합니다.',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      );
+    }
     const layoutText = buildLayoutText(
       recognized.lines || [],
       recognized.fullText,
@@ -819,7 +836,14 @@ export async function runReceiptOcr(
       modelVersion: recognized.modelVersion,
       recognizedLines: recognized.lines,
       processingMs: recognized.processingMs,
-      variantsCompared: recognized.variantsCompared ?? parsed.variantsCompared,
+      variantsCompared:
+        'variantsCompared' in recognized
+          ? recognized.variantsCompared ?? parsed.variantsCompared
+          : parsed.variantsCompared,
+      ocrDiagnostics: {
+        ...recognized.diagnostics,
+        rawTextLength: textForParsing.length,
+      },
     });
   } catch (error) {
     if (error instanceof OcrNoTextDetectedError) throw error;
