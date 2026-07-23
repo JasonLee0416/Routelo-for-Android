@@ -1,4 +1,5 @@
 import {
+  OcrNoTextDetectedError,
   OcrRecognizerUnavailableError,
   parseReceiptText,
   runReceiptOcr,
@@ -77,6 +78,22 @@ describe('OCR zero-fabrication guard', () => {
     expect(result.processingMs).toBe(321);
     expect(result.rawText).toContain('FL-20260621-1842');
     expect(result.recognizedLines?.[0].text).toContain('주문번호');
+  });
+
+  it('fails closed when OCR output has no usable receipt evidence', async () => {
+    const recognizer = jest.fn().mockResolvedValue({
+      fullText: '받는문.고인김기회 TEL',
+      lines: [{ text: '받는문.고인김기회 TEL', confidence: 0.84 }],
+      processingMs: 84,
+    });
+
+    await expect(
+      runReceiptOcr({
+        uri: 'file:///garbled-receipt.jpg',
+        width: 1440,
+        height: 1920,
+      }, undefined, recognizer),
+    ).rejects.toBeInstanceOf(OcrNoTextDetectedError);
   });
 
   it('uses PP-OCR geometry to associate labels with values', async () => {
