@@ -3,11 +3,20 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  AccessibilityInfo,
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -74,6 +83,7 @@ import {
   markDeliveryForRevisitWithProof,
 } from './services/proofOfDelivery';
 import { summarizeDailyProfit } from './services/profit';
+import { NAV_RIPPLE, useReduceMotion } from './ui/motion';
 import {
   buildBackupJson,
   parseBackup,
@@ -3333,6 +3343,13 @@ function OcrScannerModal({
 export default function RouteloApp() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
+  const reduceMotion = useReduceMotion();
+  // 탭마다 독립적인 리플 진행도(0→1). useRef는 인자를 매 렌더 평가하므로
+  // useMemo로 최초 1회만 생성한다(탭 개수는 모듈 상수라 고정).
+  const navRipples = useMemo(
+    () => tabs.map(() => new Animated.Value(0)),
+    [],
+  );
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const deliveries = useMemo(
     () => orders.map(orderToLegacyDelivery),
@@ -3349,20 +3366,11 @@ export default function RouteloApp() {
   const [mileageLogs, setMileageLogs] = useState<MileageLog[]>([]);
   const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
 
+  // 모션 설정 구독은 useReduceMotion 훅 하나로 통일한다. animateLayout은 모듈
+  // 스코프 함수라 훅 값을 직접 못 읽으므로, 훅 결과를 전역 플래그에 반영한다.
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        reduceMotionEnabled = enabled;
-      })
-      .catch(() => undefined);
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      (enabled) => {
-        reduceMotionEnabled = enabled;
-      },
-    );
-    return () => subscription.remove();
-  }, []);
+    reduceMotionEnabled = reduceMotion;
+  }, [reduceMotion]);
 
   useEffect(() => {
     deliveryRepository
@@ -3751,7 +3759,7 @@ export default function RouteloApp() {
             },
           ]}
         >
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const selected = tab.key === activeTab;
             return (
               <Pressable
@@ -3761,8 +3769,43 @@ export default function RouteloApp() {
                 onPress={() => {
                   animateLayout(MOTION.quickMs);
                   setActiveTab(tab.key);
+                  if (!reduceMotion) {
+                    const ripple = navRipples[index];
+                    ripple.setValue(0);
+                    Animated.timing(ripple, {
+                      toValue: 1,
+                      duration: NAV_RIPPLE.durationMs,
+                      easing: Easing.out(Easing.quad),
+                      useNativeDriver: true,
+                    }).start();
+                  }
                 }}
               >
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    left: '50%',
+                    marginLeft: -NAV_RIPPLE.size / 2,
+                    width: NAV_RIPPLE.size,
+                    height: NAV_RIPPLE.size,
+                    borderRadius: NAV_RIPPLE.size / 2,
+                    backgroundColor: C.primary,
+                    opacity: navRipples[index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [NAV_RIPPLE.fromOpacity, 0],
+                    }),
+                    transform: [
+                      {
+                        scale: navRipples[index].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [NAV_RIPPLE.fromScale, NAV_RIPPLE.toScale],
+                        }),
+                      },
+                    ],
+                  }}
+                />
                 <View style={[styles.navIcon, selected && styles.navIconSelected]}>
                   <Ionicons
                     name={selected ? tab.activeIcon : tab.icon}
