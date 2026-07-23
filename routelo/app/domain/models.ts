@@ -101,6 +101,9 @@ export type DeliveryOrder = {
   customerRequests?: string;
   status: DeliveryStatus;
   proofOfDelivery?: ProofOfDelivery;
+  // 스캔한 인수증 원본 사진의 앱 문서 디렉터리 기준 상대 경로.
+  // 상대 경로로 저장해야 앱 컨테이너 UUID가 바뀌어도 다시 찾을 수 있다.
+  receiptPhotoPath?: string;
   settlement: SettlementInfo;
   source: {
     type: 'manual' | 'ocr' | 'migration' | 'sample';

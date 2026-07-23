@@ -10,6 +10,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -82,14 +83,28 @@ import {
   hasProofReason,
   markDeliveryForRevisitWithProof,
 } from './services/proofOfDelivery';
-import { summarizeDailyProfit } from './services/profit';
-import { NAV_RIPPLE, useReduceMotion } from './ui/motion';
+import {
+  buildProfitTrend,
+  summarizeDailyProfit,
+  type ProfitTrendPoint,
+} from './services/profit';
+import {
+  barRiseStart,
+  NAV_RIPPLE,
+  PROFIT_BARS,
+  useReduceMotion,
+} from './ui/motion';
 import {
   buildBackupJson,
   parseBackup,
   type RouteloBackup,
 } from './services/backup';
-import { completionPhotoUri, persistCompletionPhoto } from './services/completionPhoto';
+import {
+  completionPhotoUri,
+  persistCompletionPhoto,
+  persistReceiptPhoto,
+  receiptPhotoUri,
+} from './services/completionPhoto';
 import { summarizeEfficiencyByVehicle } from './services/efficiency';
 import { buildDailyProfitCsv } from './services/export';
 import { createFuelLog } from './services/fuel';
@@ -280,6 +295,14 @@ const maskAddressForList = (address: string): string => {
 };
 
 const formatWon = (value: number) => `${Math.round(value).toLocaleString('ko-KR')}원`;
+
+// 막대 위 라벨은 폭이 좁아 만원 단위로 줄여 표기한다.
+const formatWonShort = (value: number) => {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  if (abs >= 10000) return `${sign}${Math.round(abs / 1000) / 10}만`;
+  return `${sign}${Math.round(abs).toLocaleString('ko-KR')}`;
+};
 
 const tabs: Array<{
   key: TabKey;
@@ -1093,6 +1116,77 @@ const accountVehicleLabel = (value?: string) => value?.trim() || undefined;
 const timeLabel = (value?: string) =>
   value?.match(/T(\d{2}:\d{2})/)?.[1] || '';
 
+// 손익 추이 막대. 화면에 들어올 때 0에서 좌→우 시차로 차오른다
+// (Routelo-for-IOS #39 모션 이식). 모션 줄이기 설정이면 즉시 최종 높이.
+function ProfitTrendChart({ points }: { points: ProfitTrendPoint[] }) {
+  const { C, styles } = useTheme();
+  const reduceMotion = useReduceMotion();
+  const grow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduceMotion) {
+      grow.setValue(1);
+      return;
+    }
+    grow.setValue(0);
+    Animated.timing(grow, {
+      toValue: 1,
+      duration: PROFIT_BARS.durationMs,
+      easing: Easing.out(Easing.cubic),
+      // height를 보간하므로 네이티브 드라이버는 쓸 수 없다.
+      useNativeDriver: false,
+    }).start();
+  }, [grow, points.length, reduceMotion]);
+
+  if (!points.length) {
+    return (
+      <View style={styles.profitTrendCard}>
+        <Text style={styles.profitTrendEmpty}>표시할 손익 데이터가 없습니다</Text>
+      </View>
+    );
+  }
+
+  const maxAbs = Math.max(1, ...points.map((point) => Math.abs(point.net)));
+  return (
+    <View style={styles.profitTrendCard}>
+      <View style={styles.profitTrendRow}>
+        {points.map((point, index) => {
+          const height = 6 + (Math.abs(point.net) / maxAbs) * 96;
+          const positive = point.net >= 0;
+          const start = barRiseStart(index);
+          return (
+            <View key={point.date} style={styles.profitTrendItem}>
+              <Text
+                style={[
+                  styles.profitTrendValue,
+                  { color: positive ? C.success : C.danger },
+                ]}
+                numberOfLines={1}
+              >
+                {formatWonShort(point.net)}
+              </Text>
+              <Animated.View
+                style={{
+                  width: 16,
+                  height: grow.interpolate({
+                    inputRange: [start, start + PROFIT_BARS.riseWindow],
+                    outputRange: [2, height],
+                    extrapolate: 'clamp',
+                  }),
+                  borderRadius: 5,
+                  backgroundColor: positive ? C.primary : C.danger,
+                }}
+              />
+              <Text style={styles.profitTrendLabel} numberOfLines={1}>
+                {point.label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function CalendarScreen({
   orders,
   fuelLogs,
@@ -1164,6 +1258,10 @@ function CalendarScreen({
   const dailySummaries = useMemo(
     () => summarizeDailyProfit(orders, fuelLogs, settings),
     [fuelLogs, orders, settings],
+  );
+  const profitTrend = useMemo(
+    () => buildProfitTrend(dailySummaries),
+    [dailySummaries],
   );
   const selectedFuelLogs = fuelLogs.filter((log) => log.date === selectedDate);
   const selectedMileageLogs = mileageLogs.filter((log) => log.date === selectedDate);
@@ -1357,6 +1455,8 @@ function CalendarScreen({
           </Text>
         </View>
       </View>
+      <SectionHeader title="손익 추이" caption="최근 실적일 기준 순수익" />
+      <ProfitTrendChart points={profitTrend} />
       <Pressable
         style={styles.sectionToggle}
         onPress={() => {
@@ -1520,6 +1620,10 @@ function CalendarScreen({
             (entry) => entry.id === item.deliveryOrderId,
           );
           const delivery = order ? orderToLegacyDelivery(order) : undefined;
+          // 인수증 원본은 상대 경로로 보관하므로 현재 문서 경로 기준으로 해석한다.
+          const receiptUri = order?.receiptPhotoPath
+            ? receiptPhotoUri(order.receiptPhotoPath)
+            : undefined;
           const primaryTime =
             timeLabel(item.deadlineAt) ||
             timeLabel(item.startAt) ||
@@ -1551,6 +1655,13 @@ function CalendarScreen({
                       : '확정 일정'}
                 </Text>
               </View>
+              {receiptUri && (
+                <Image
+                  source={{ uri: receiptUri }}
+                  style={styles.calendarReceiptThumb}
+                  accessibilityLabel="스캔한 인수증"
+                />
+              )}
               <View style={styles.calendarAgendaBody}>
                 <Text style={styles.calendarAgendaTitle}>{item.title}</Text>
                 <Text style={styles.calendarAgendaAddress}>
@@ -2474,15 +2585,20 @@ function DeliveryDetailSheet({
               {(order?.proofOfDelivery?.photoUris.length || 0) > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.proofPhotoRow}>
-                    {order?.proofOfDelivery?.photoUris.map((uri) => (
-                      <Image
-                        key={uri}
-                        source={{
-                          uri: uri.startsWith('file:') ? uri : completionPhotoUri(uri),
-                        }}
-                        style={styles.proofPhotoThumb}
-                      />
-                    ))}
+                    {order?.proofOfDelivery?.photoUris.map((uri) => {
+                      // 경로 검증에 실패한 항목은 아예 그리지 않는다.
+                      const resolved = uri.startsWith('file:')
+                        ? uri
+                        : completionPhotoUri(uri);
+                      if (!resolved) return null;
+                      return (
+                        <Image
+                          key={uri}
+                          source={{ uri: resolved }}
+                          style={styles.proofPhotoThumb}
+                        />
+                      );
+                    })}
                   </View>
                 </ScrollView>
               ) : (
@@ -2811,7 +2927,7 @@ function OcrScannerModal({
   visible: boolean;
   settings: RouteloSettings;
   onClose: () => void;
-  onRegister: (delivery: Delivery) => void;
+  onRegister: (delivery: Delivery, receiptUri?: string) => void;
 }) {
   const { C, styles } = useTheme();
   const [stage, setStage] = useState<ScanStage>('capture');
@@ -3013,7 +3129,8 @@ function OcrScannerModal({
       latitude: verifiedAddress.latitude,
       longitude: verifiedAddress.longitude,
     };
-    onRegister(delivery);
+    // 스캔 원본을 함께 넘겨 달력에서 인수증을 다시 볼 수 있게 한다.
+    onRegister(delivery, imageUri);
     Alert.alert('등록 완료', '검수된 OCR 정보가 오늘의 배달 목록에 추가되었습니다.');
     onClose();
   };
@@ -3839,7 +3956,7 @@ export default function RouteloApp() {
         visible={scannerVisible}
         settings={settings}
         onClose={() => setScannerVisible(false)}
-        onRegister={(delivery) => {
+        onRegister={(delivery, receiptUri) => {
           const fee = calculateFeeByAddress(delivery.deliveryAddress, settings);
           const district = findDistrictByAddress(delivery.deliveryAddress, settings);
           const order = legacyDeliveryToOrder({
@@ -3850,6 +3967,26 @@ export default function RouteloApp() {
           order.source = { type: 'ocr' };
           setOrders((current) => [order, ...current]);
           deliveryRepository.save(order).catch(() => undefined);
+          // 인수증 원본 보관은 등록을 막지 않는다. 실패해도 배송 등록은 유지된다.
+          if (receiptUri) {
+            void persistReceiptPhoto(order.id, receiptUri)
+              .then(async (relativePath) => {
+                // 사진 복사는 수백 ms 걸리고 그 사이 사용자가 배송을 완료/실패로
+                // 바꿀 수 있다. 등록 시점 스냅샷(order)을 그대로 저장하면 그 편집이
+                // 덮여 사라지므로 반드시 최신 상태에 병합한다.
+                let merged: DeliveryOrder | undefined;
+                setOrders((current) =>
+                  current.map((item) => {
+                    if (item.id !== order.id) return item;
+                    merged = { ...item, receiptPhotoPath: relativePath };
+                    return merged;
+                  }),
+                );
+                // 목록에서 사라진 주문이면 저장소에 되살리지 않는다.
+                if (merged) await deliveryRepository.save(merged);
+              })
+              .catch(() => undefined);
+          }
           animateLayout(MOTION.quickMs);
           setActiveTab('deliveries');
         }}
@@ -3958,33 +4095,6 @@ const makeStyles = (C: Palette) =>
   mainContent: { flex: 1, paddingBottom: 112 },
   flex: { flex: 1 },
   screenContent: { paddingHorizontal: 18, paddingBottom: 132 },
-  calendarModeRow: {
-    flexDirection: 'row',
-    padding: 4,
-    borderRadius: 22,
-    backgroundColor: C.glass,
-    borderWidth: 1,
-    borderColor: C.glassBorder,
-    marginBottom: 12,
-  },
-  calendarModeButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calendarModeButtonActive: {
-    backgroundColor: C.glassStrong,
-    borderWidth: 1,
-    borderColor: C.glassHighlight,
-    shadowColor: '#000000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  calendarModeText: { color: C.textMuted, fontWeight: '700' },
-  calendarModeTextActive: { color: C.primary },
   calendarCard: {
     backgroundColor: C.surface,
     borderRadius: 28,
@@ -4022,7 +4132,6 @@ const makeStyles = (C: Palette) =>
     borderRadius: 14,
     gap: 2,
   },
-  calendarDayWide: { minHeight: 64 },
   calendarDaySelected: { backgroundColor: C.primaryContainer },
   calendarDayText: { color: C.text, fontWeight: '700' },
   calendarDayOutside: { color: '#B7C0CE' },
@@ -4066,6 +4175,31 @@ const makeStyles = (C: Palette) =>
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 14,
+  },
+  profitTrendCard: {
+    backgroundColor: C.surfaceRaised,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: C.outline,
+    padding: 18,
+    marginBottom: 12,
+  },
+  profitTrendRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-around',
+    // 막대 최대 102 + 값/라벨 텍스트 + gap. 여유를 두지 않으면 글꼴 확대 시
+    // 상단 금액 라벨부터 잘린다.
+    height: 140,
+  },
+  profitTrendItem: { alignItems: 'center', flex: 1, gap: 4 },
+  profitTrendValue: { fontSize: 9, fontWeight: '700' },
+  profitTrendLabel: { fontSize: 9, color: C.textMuted },
+  profitTrendEmpty: {
+    color: C.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 24,
   },
   profitSummaryLabel: { color: C.textMuted, fontSize: 12, fontWeight: '700' },
   profitSummaryValue: {
@@ -4179,6 +4313,13 @@ const makeStyles = (C: Palette) =>
     borderColor: C.outline,
     padding: 16,
     marginBottom: 10,
+  },
+  calendarReceiptThumb: {
+    width: 44,
+    height: 58,
+    borderRadius: 8,
+    marginRight: 10,
+    backgroundColor: C.surface,
   },
   calendarAgendaCardConflict: {
     borderColor: C.warning,

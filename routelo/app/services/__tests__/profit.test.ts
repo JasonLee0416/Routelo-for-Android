@@ -3,9 +3,11 @@ import { FuelLog } from '../../models';
 import { DEFAULT_ROUTELO_SETTINGS, RouteloSettings } from '../../settings';
 import { calculateFeeByAddress, findDistrictByAddress } from '../maps';
 import {
+  buildProfitTrend,
   createCalendarProfitDays,
   summarizeDailyProfit,
   summarizePeriodProfit,
+  type DailyProfitSummary,
 } from '../profit';
 
 const settings: RouteloSettings = {
@@ -154,5 +156,70 @@ describe('profit summaries', () => {
       net: 37000,
       deliveryCount: 2,
     });
+  });
+});
+
+describe('buildProfitTrend', () => {
+  const summary = (
+    net: number,
+    count = 1,
+    fuelCost = 0,
+  ): DailyProfitSummary => ({ revenue: net + fuelCost, fuelCost, net, count });
+
+  it('sorts by date, keeps only active days, and takes the most recent N', () => {
+    const daily = new Map<string, DailyProfitSummary>([
+      ['2026-07-03', summary(3000)],
+      ['2026-07-01', summary(1000)],
+      ['2026-07-02', summary(2000)],
+      // 배송도 유류비도 없는 날은 막대가 뭉개지므로 제외한다.
+      ['2026-07-04', summary(0, 0, 0)],
+    ]);
+    const trend = buildProfitTrend(daily, 2);
+    expect(trend.map((point) => point.date)).toEqual([
+      '2026-07-02',
+      '2026-07-03',
+    ]);
+    expect(trend[0].label).toBe('07/02');
+    expect(trend[1].net).toBe(3000);
+  });
+
+  it('keeps fuel-only days and handles an empty map', () => {
+    const daily = new Map<string, DailyProfitSummary>([
+      ['2026-07-05', summary(-8000, 0, 8000)],
+    ]);
+    expect(buildProfitTrend(daily)).toHaveLength(1);
+    expect(buildProfitTrend(new Map())).toEqual([]);
+  });
+});
+
+describe('buildProfitTrend future dates', () => {
+  const summary = (net: number): DailyProfitSummary => ({
+    revenue: net,
+    fuelCost: 0,
+    net,
+    count: 1,
+  });
+
+  it('excludes scheduled future deliveries from the recent-actuals trend', () => {
+    const today = new Date(2026, 6, 22); // 2026-07-22 (local)
+    const daily = new Map<string, DailyProfitSummary>([
+      ['2026-07-20', summary(1000)],
+      ['2026-07-22', summary(2000)],
+      // 다음 달로 예약된 배송은 아직 실적이 아니다.
+      ['2026-08-15', summary(9999)],
+    ]);
+    const trend = buildProfitTrend(daily, 8, today);
+    expect(trend.map((point) => point.date)).toEqual([
+      '2026-07-20',
+      '2026-07-22',
+    ]);
+  });
+
+  it('keeps today itself in the window', () => {
+    const today = new Date(2026, 6, 22);
+    const daily = new Map<string, DailyProfitSummary>([
+      ['2026-07-22', summary(500)],
+    ]);
+    expect(buildProfitTrend(daily, 8, today)).toHaveLength(1);
   });
 });
