@@ -8,15 +8,9 @@
     "icon": "./assets/icon.png",
     "backgroundColor": "#F8F7F4",
     "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#F8F7F4"
-    },
     "androidStatusBar": {
       "backgroundColor": "#F8F7F4",
       "barStyle": "dark-content"
-    },
-    "notification": {
-      "color": "#0047FF"
     },
     "ios": {
       "supportsTablet": true,
