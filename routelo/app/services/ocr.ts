@@ -836,7 +836,10 @@ export async function runReceiptOcr(
       modelVersion: recognized.modelVersion,
       recognizedLines: recognized.lines,
       processingMs: recognized.processingMs,
-      variantsCompared: recognized.variantsCompared ?? parsed.variantsCompared,
+      variantsCompared:
+        'variantsCompared' in recognized
+          ? recognized.variantsCompared ?? parsed.variantsCompared
+          : parsed.variantsCompared,
       ocrDiagnostics: {
         ...recognized.diagnostics,
         rawTextLength: textForParsing.length,

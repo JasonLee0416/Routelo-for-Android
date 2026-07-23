@@ -3376,7 +3376,9 @@ function OcrScannerModal({
                   <Text style={styles.ocrSummaryMetaText}>
                     {result.engine === 'ppocrv5'
                       ? `PP-OCRv5 온디바이스 OCR${result.modelVersion ? ` · ${result.modelVersion}` : ''}`
-                      : '명시적 테스트 샘플'}
+                      : result.engine === 'mlkit-v2-korean'
+                        ? `Android Korean Text OCR${result.modelVersion ? ` · ${result.modelVersion}` : ''}`
+                        : '명시적 테스트 샘플'}
                   </Text>
                   <Text style={styles.ocrSummaryMetaText}>
                     {liveSession.acceptedFrameCount}개 프레임 누적 · {result.processingMs}ms

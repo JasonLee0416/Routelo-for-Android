@@ -4,6 +4,8 @@ const path = require('path');
 const { withDangerousMod } = require('@expo/config-plugins');
 
 const PACKAGE_ADD_MARKER = 'add(RouteloAndroidPpocrFrameRecognizerPackage())';
+const TEXT_RECOGNITION_DEPENDENCY =
+  'implementation("com.google.mlkit:text-recognition-korean:16.0.1")';
 
 function packageNameToPath(packageName) {
   return packageName.split('.').join(path.sep);
@@ -46,6 +48,19 @@ function patchMainApplication(mainApplicationPath, packageName) {
   }
 
   fs.writeFileSync(mainApplicationPath, source);
+}
+
+function patchAppBuildGradle(appBuildGradlePath) {
+  if (!fs.existsSync(appBuildGradlePath)) {
+    throw new Error(`Unable to find app/build.gradle at ${appBuildGradlePath}.`);
+  }
+  let source = fs.readFileSync(appBuildGradlePath, 'utf8');
+  if (source.includes(TEXT_RECOGNITION_DEPENDENCY)) return;
+  source = source.replace(
+    /dependencies\s*\{\r?\n/,
+    (match) => `${match}    ${TEXT_RECOGNITION_DEPENDENCY}\n`,
+  );
+  fs.writeFileSync(appBuildGradlePath, source);
 }
 
 function androidModuleSource(packageName) {
@@ -99,6 +114,82 @@ class RouteloAndroidPpocrFrameRecognizerModule(
 `;
 }
 
+function androidKoreanTextModuleSource(packageName) {
+  return `package ${packageName}.ocr
+
+import android.net.Uri
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReactContextBaseJavaModule
+import com.facebook.react.bridge.ReactMethod
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
+
+class RouteloAndroidKoreanTextRecognizerModule(
+  private val reactContext: ReactApplicationContext
+) : ReactContextBaseJavaModule(reactContext) {
+  override fun getName(): String = NAME
+
+  @ReactMethod
+  fun recognizeImage(imageUri: String, promise: Promise) {
+    val startedAt = System.currentTimeMillis()
+    try {
+      val image = InputImage.fromFilePath(reactContext, Uri.parse(imageUri))
+      val recognizer = TextRecognition.getClient(
+        KoreanTextRecognizerOptions.Builder().build()
+      )
+      recognizer.process(image)
+        .addOnSuccessListener { text ->
+          val result = Arguments.createMap()
+          val lines = Arguments.createArray()
+          for (block in text.textBlocks) {
+            for (line in block.lines) {
+              val lineMap = Arguments.createMap()
+              lineMap.putString("text", line.text)
+              lineMap.putDouble("confidence", 0.86)
+              val box = line.boundingBox
+              if (box != null) {
+                val boundingBox = Arguments.createMap()
+                boundingBox.putDouble("x", box.left.toDouble())
+                boundingBox.putDouble("y", box.top.toDouble())
+                boundingBox.putDouble("width", box.width().toDouble())
+                boundingBox.putDouble("height", box.height().toDouble())
+                lineMap.putMap("boundingBox", boundingBox)
+              }
+              lines.pushMap(lineMap)
+            }
+          }
+          val diagnostics = Arguments.createMap()
+          diagnostics.putString("preprocessProfileId", "android-korean-text")
+          diagnostics.putInt("regionCount", text.textBlocks.size)
+          diagnostics.putInt("acceptedLineCount", lines.size())
+          diagnostics.putInt("rawTextLength", text.text.length)
+
+          result.putString("engine", "mlkit-v2-korean")
+          result.putString("modelVersion", "com.google.mlkit:text-recognition-korean:16.0.1")
+          result.putString("fullText", text.text)
+          result.putArray("lines", lines)
+          result.putDouble("processingMs", (System.currentTimeMillis() - startedAt).toDouble())
+          result.putMap("diagnostics", diagnostics)
+          promise.resolve(result)
+        }
+        .addOnFailureListener { error ->
+          promise.reject("E_ROUTELO_ANDROID_KOREAN_TEXT_RECOGNITION", error)
+        }
+    } catch (error: Exception) {
+      promise.reject("E_ROUTELO_ANDROID_KOREAN_TEXT_INPUT", error)
+    }
+  }
+
+  companion object {
+    const val NAME = "RouteloAndroidKoreanTextRecognizer"
+  }
+}
+`;
+}
+
 function androidPackageSource(packageName) {
   return `package ${packageName}.ocr
 
@@ -111,7 +202,8 @@ class RouteloAndroidPpocrFrameRecognizerPackage : ReactPackage {
   override fun createNativeModules(
     reactContext: ReactApplicationContext
   ): MutableList<NativeModule> = mutableListOf(
-    RouteloAndroidPpocrFrameRecognizerModule(reactContext)
+    RouteloAndroidPpocrFrameRecognizerModule(reactContext),
+    RouteloAndroidKoreanTextRecognizerModule(reactContext)
   )
 
   override fun createViewManagers(
@@ -150,10 +242,15 @@ module.exports = function withAndroidPpocrFrameRecognizer(config) {
         androidModuleSource(androidPackage),
       );
       writeFileIfChanged(
+        path.join(ocrRoot, 'RouteloAndroidKoreanTextRecognizerModule.kt'),
+        androidKoreanTextModuleSource(androidPackage),
+      );
+      writeFileIfChanged(
         path.join(ocrRoot, 'RouteloAndroidPpocrFrameRecognizerPackage.kt'),
         androidPackageSource(androidPackage),
       );
       patchMainApplication(path.join(javaRoot, 'MainApplication.kt'), androidPackage);
+      patchAppBuildGradle(path.join(projectRoot, 'app', 'build.gradle'));
 
       return config;
     },
