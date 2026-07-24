@@ -1,4 +1,5 @@
 import {
+  inspectCaptureQuality,
   OcrNoTextDetectedError,
   OcrRecognizerUnavailableError,
   parseReceiptText,
@@ -37,6 +38,24 @@ const quality = {
 };
 
 describe('OCR zero-fabrication guard', () => {
+  it('does not fabricate trusted capture quality scores without pixel analysis', () => {
+    const fallbackQuality = inspectCaptureQuality({
+      uri: 'file:///same-resolution-receipt.jpg',
+      width: 1440,
+      height: 1920,
+    });
+
+    expect(fallbackQuality.measured).toBe(false);
+    expect(fallbackQuality.passed).toBe(false);
+    expect(fallbackQuality.score).toBe(0);
+    expect(fallbackQuality.brightness).toBe(0);
+    expect(fallbackQuality.skew).toBe(0);
+    expect(fallbackQuality.shadow).toBe(0);
+    expect(fallbackQuality.messages.join(' ')).toContain(
+      '픽셀을 분석하지 못해',
+    );
+  });
+
   it('rejects a real capture when no recognizer text exists', async () => {
     const recognizer = jest.fn().mockRejectedValue(
       new Error('Native recognizer unavailable'),

@@ -390,41 +390,37 @@ function safeReceiptRecipientName(value: string) {
 }
 
 export function inspectCaptureQuality(asset: ImageAssetInfo): CaptureQuality {
-  const width = asset.width || 1200;
-  const height = asset.height || 1600;
-  const pixels = width * height;
-  const coverage = Math.min(
-    98,
-    Math.max(52, (Math.min(width, height) / Math.max(width, height)) * 145),
-  );
-  const resolutionScore = Math.min(100, pixels / 18000);
-  const blur = Math.round(Math.min(96, 62 + resolutionScore * 0.34));
-  const brightness = 82;
-  const skew = 93;
-  const shadow = 87;
-  const score = Math.round(
-    (blur + brightness + coverage + skew + shadow) / 5,
-  );
-  const messages: string[] = [];
-  if (blur < 65) messages.push('사진이 흔들렸습니다. 다시 촬영해주세요.');
-  if (brightness < 60) {
-    messages.push('인수증이 너무 어둡습니다. 밝은 곳에서 촬영해주세요.');
+  const width = asset.width;
+  const height = asset.height;
+  const shortestSide = Math.min(width || 0, height || 0);
+  const longestSide = Math.max(width || 0, height || 0);
+  const messages = [
+    '실제 이미지 픽셀을 분석하지 못해 선명도, 밝기, 문서 영역, 기울기, 그림자 점수를 신뢰할 수 없습니다.',
+  ];
+
+  if (!width || !height) {
+    messages.push('이미지 해상도 정보도 없어 재촬영 또는 다른 사진 선택이 필요합니다.');
+  } else if (shortestSide < 1080) {
+    messages.push('이미지의 짧은 변이 작습니다. 인수증을 더 가까이 촬영해야 합니다.');
   }
-  if (coverage < 60) {
-    messages.push('인수증 전체가 화면에 들어오도록 맞춰주세요.');
-  }
-  if (pixels < 900000) {
-    messages.push('글자가 너무 작습니다. 조금 더 가까이 촬영해주세요.');
-  }
+
   return {
-    score,
-    blur,
-    brightness,
-    documentCoverage: Math.round(coverage),
-    skew,
-    shadow,
-    passed: score >= 65 && messages.length === 0,
+    score: 0,
+    blur: 0,
+    brightness: 0,
+    documentCoverage:
+      shortestSide && longestSide
+        ? Math.round(Math.min(100, (shortestSide / longestSide) * 100))
+        : 0,
+    skew: 0,
+    shadow: 0,
+    passed: false,
     messages,
+    measured: false,
+    metrics: {
+      width,
+      height,
+    },
   };
 }
 
