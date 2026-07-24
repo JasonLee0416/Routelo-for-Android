@@ -129,6 +129,12 @@ import {
   prepareReceiptImageForOcr,
 } from './services/ocrImagePreparation';
 import {
+  ocrDiagnosticComparisonEnabled,
+  runOcrDiagnosticComparison,
+  selectBestOcrDiagnosticCandidate,
+  type OcrDiagnosticComparisonReport,
+} from './services/ocrDiagnostics';
+import {
   createInitialLiveOcrSession,
   liveOcrChecklistItems,
   liveOcrIncompleteMessage,
@@ -2698,6 +2704,102 @@ function QualityMeter({
   );
 }
 
+function OcrDiagnosticComparisonCard({
+  report,
+}: {
+  report?: OcrDiagnosticComparisonReport;
+}) {
+  const { C, styles } = useTheme();
+  if (!report) return null;
+  return (
+    <View style={styles.ocrComparisonCard}>
+      <View style={styles.ocrComparisonHeader}>
+        <View>
+          <Text style={styles.ocrComparisonTitle}>OCR 엔진 비교 진단</Text>
+          <Text style={styles.ocrComparisonMeta}>
+            prepared {report.image.width ?? '-'}×{report.image.height ?? '-'} ·
+            quality {report.quality.measured ? 'measured' : 'unmeasured'} ·
+            decision {report.decision}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.ocrComparisonBadge,
+            report.decision === 'use-best-candidate'
+              ? styles.successBadge
+              : styles.waitBadge,
+          ]}
+        >
+          <Text
+            style={[
+              styles.badgeText,
+              {
+                color:
+                  report.decision === 'use-best-candidate'
+                    ? C.success
+                    : C.warning,
+              },
+            ]}
+          >
+            {report.bestCandidateId ?? 'manual'}
+          </Text>
+        </View>
+      </View>
+      {report.candidates.map((candidate) => {
+        const isBest = candidate.id === report.bestCandidateId;
+        const statusColor =
+          candidate.status === 'success'
+            ? C.success
+            : candidate.status === 'skipped'
+              ? C.textMuted
+              : C.warning;
+        return (
+          <View
+            key={candidate.id}
+            style={[
+              styles.ocrComparisonCandidate,
+              isBest ? styles.ocrComparisonCandidateBest : undefined,
+            ]}
+          >
+            <View style={styles.ocrComparisonCandidateHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ocrComparisonCandidateTitle}>
+                  {candidate.label}
+                </Text>
+                <Text style={[styles.ocrComparisonStatus, { color: statusColor }]}>
+                  {candidate.status}
+                  {candidate.engine ? ` · ${candidate.engine}` : ''}
+                  {candidate.modelVersion ? ` · ${candidate.modelVersion}` : ''}
+                </Text>
+              </View>
+              <Text style={styles.ocrComparisonFieldCount}>
+                {candidate.populatedFieldCount} fields
+              </Text>
+            </View>
+            <Text style={styles.ocrComparisonMeta}>
+              regions={candidate.diagnostics?.regionCount ?? '-'} ·
+              lines={candidate.diagnostics?.acceptedLineCount ?? candidate.lineCount} ·
+              text={candidate.diagnostics?.rawTextLength ?? candidate.rawTextLength} ·
+              conf={candidate.documentConfidence ?? '-'} ·
+              {candidate.processingMs}ms
+            </Text>
+            {candidate.rawTextPreview ? (
+              <Text style={styles.ocrComparisonPreview}>
+                {candidate.rawTextPreview}
+              </Text>
+            ) : null}
+            {candidate.errorMessage ? (
+              <Text style={styles.ocrComparisonError}>
+                {candidate.errorMessage}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function LiveScanChecklist({
   session,
 }: {
@@ -2856,6 +2958,8 @@ function OcrScannerModal({
   const [assetInfo, setAssetInfo] = useState<{ width?: number; height?: number; fileSize?: number }>({});
   const [result, setResult] = useState<OcrPipelineResult>();
   const [aggregateResult, setAggregateResult] = useState<OcrPipelineResult>();
+  const [diagnosticReport, setDiagnosticReport] =
+    useState<OcrDiagnosticComparisonReport>();
   const [fields, setFields] = useState<OcrFieldResult[]>([]);
   const [ocrErrorMessage, setOcrErrorMessage] = useState<string>();
   const [vendorCheck, setVendorCheck] = useState<VendorVerification>();
@@ -2873,6 +2977,7 @@ function OcrScannerModal({
     setAssetInfo({});
     setResult(undefined);
     setAggregateResult(undefined);
+    setDiagnosticReport(undefined);
     setFields([]);
     setOcrErrorMessage(undefined);
     setVendorCheck(undefined);
@@ -2979,12 +3084,46 @@ function OcrScannerModal({
     setVendorCheck(undefined);
     setOcrErrorMessage(undefined);
     try {
-      const next = await runReceiptOcr(
-        { ...assetInfo, uri: ocrImageUri || imageUri },
-        undefined,
-        undefined,
-        result?.quality,
-      );
+      const ocrInput = {
+        ...assetInfo,
+        uri: ocrImageUri || imageUri,
+        originalUri: imageUri,
+        normalized: Boolean(ocrImageUri && ocrImageUri !== imageUri),
+      };
+      let next: OcrPipelineResult;
+      if (ocrDiagnosticComparisonEnabled()) {
+        const report = await runOcrDiagnosticComparison(
+          ocrInput,
+          result?.quality ?? {
+            score: 0,
+            blur: 0,
+            brightness: 0,
+            documentCoverage: 0,
+            skew: 0,
+            shadow: 0,
+            passed: false,
+            messages: [],
+          },
+        );
+        setDiagnosticReport(report);
+        const best = selectBestOcrDiagnosticCandidate(report.candidates);
+        if (!best?.result) {
+          const message =
+            'OCR 후보 비교에서 등록 가능한 텍스트를 찾지 못했습니다. 진단 카드의 engine / regions / lines / text 값을 확인해야 합니다.';
+          setStageAnimated('quality');
+          setOcrErrorMessage(message);
+          Alert.alert('OCR 후보 비교 실패', message);
+          return;
+        }
+        next = best.result;
+      } else {
+        next = await runReceiptOcr(
+          ocrInput,
+          undefined,
+          undefined,
+          result?.quality,
+        );
+      }
       const merged = mergeOcrResult(aggregateResult, next);
       const nextSession = updateLiveOcrSession(liveSession, next);
       setAggregateResult(merged);
@@ -3248,6 +3387,7 @@ function OcrScannerModal({
                 </View>
               </View>
             ) : null}
+            <OcrDiagnosticComparisonCard report={diagnosticReport} />
             <View style={styles.variantInfo}>
               <Ionicons name="layers-outline" size={20} color={C.primary} />
               <Text style={styles.variantInfoText}>
@@ -3334,6 +3474,7 @@ function OcrScannerModal({
                   </Text>
                 </View>
               )}
+              <OcrDiagnosticComparisonCard report={diagnosticReport} />
               <LiveScanChecklist session={liveSession} />
               <View style={styles.reviewGuide}>
                 <Ionicons name="information-circle-outline" size={19} color={C.primary} />
@@ -5079,6 +5220,74 @@ const makeStyles = (C: Palette) =>
   },
   ocrDiagnosticTitle: { color: C.text, fontSize: 11, fontWeight: '900', marginBottom: 4 },
   ocrDiagnosticText: { color: C.textMuted, fontSize: 10, fontWeight: '700', lineHeight: 15 },
+  ocrComparisonCard: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.surface,
+    gap: 10,
+  },
+  ocrComparisonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  ocrComparisonTitle: { color: C.text, fontSize: 13, fontWeight: '900' },
+  ocrComparisonMeta: {
+    color: C.textMuted,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 14,
+    marginTop: 3,
+  },
+  ocrComparisonBadge: {
+    minHeight: 28,
+    borderRadius: 14,
+    paddingHorizontal: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ocrComparisonCandidate: {
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.background,
+  },
+  ocrComparisonCandidateBest: {
+    borderColor: C.success,
+    backgroundColor: C.successBg,
+  },
+  ocrComparisonCandidateHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  ocrComparisonCandidateTitle: { color: C.text, fontSize: 11, fontWeight: '900' },
+  ocrComparisonStatus: { fontSize: 9, fontWeight: '800', marginTop: 2 },
+  ocrComparisonFieldCount: {
+    color: C.primary,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  ocrComparisonPreview: {
+    color: C.text,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '700',
+    marginTop: 7,
+  },
+  ocrComparisonError: {
+    color: C.warning,
+    fontSize: 9,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginTop: 7,
+  },
   variantInfo: {
     padding: 13,
     marginTop: 10,
