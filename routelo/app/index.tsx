@@ -3200,7 +3200,7 @@ function OcrScannerModal({
                 <View>
                   <Text style={styles.qualityCardTitle}>프레임 품질 분석</Text>
                   <Text style={styles.qualityMeasuredText}>
-                    {quality.measured ? '실제 이미지 픽셀 기반 측정' : '이미지 분석 실패 · 추정값'}
+                    {quality.measured ? '실제 이미지 픽셀 기반 측정' : '이미지 분석 실패 · 점수 미제공'}
                   </Text>
                 </View>
                 <View style={[styles.badge, quality.passed ? styles.successBadge : styles.waitBadge]}>
@@ -3209,14 +3209,25 @@ function OcrScannerModal({
                   </Text>
                 </View>
               </View>
-              <QualityMeter label="선명도" value={quality.blur} icon="aperture-outline" />
-              <QualityMeter label="밝기" value={quality.brightness} icon="sunny-outline" />
-              <QualityMeter label="문서 영역" value={quality.documentCoverage} icon="scan-outline" />
-              <QualityMeter label="기울기" value={quality.skew} icon="move-outline" />
-              <QualityMeter label="그림자" value={quality.shadow} icon="contrast-outline" />
+              {quality.measured ? (
+                <>
+                  <QualityMeter label="선명도" value={quality.blur} icon="aperture-outline" />
+                  <QualityMeter label="밝기" value={quality.brightness} icon="sunny-outline" />
+                  <QualityMeter label="문서 영역" value={quality.documentCoverage} icon="scan-outline" />
+                  <QualityMeter label="기울기" value={quality.skew} icon="move-outline" />
+                  <QualityMeter label="그림자" value={quality.shadow} icon="contrast-outline" />
+                </>
+              ) : (
+                <View style={styles.qualityWarning}>
+                  <Ionicons name="warning-outline" size={18} color={C.warning} />
+                  <Text style={styles.qualityWarningText}>
+                    실제 이미지 픽셀 분석에 실패했습니다. 고정 추정 점수는 표시하지 않으며, 다른 사진을 선택하거나 다시 촬영해 주세요.
+                  </Text>
+                </View>
+              )}
               {quality.metrics ? (
                 <Text style={styles.qualityMetricText}>
-                  sharp={quality.metrics.sharpnessVariance ?? '-'} · lum={quality.metrics.luminanceMean ?? '-'} · paper={quality.metrics.paperPixelRatio ?? '-'} · box={quality.metrics.documentBoxRatio ?? '-'}
+                  sharp={quality.metrics.sharpnessVariance ?? '-'} · lum={quality.metrics.luminanceMean ?? '-'} · paper={quality.metrics.paperPixelRatio ?? '-'} · box={quality.metrics.documentBoxRatio ?? '-'} · shadow={quality.metrics.shadowTileStd ?? '-'} · skew={quality.metrics.skewDegrees ?? '-'}
                 </Text>
               ) : null}
             </View>

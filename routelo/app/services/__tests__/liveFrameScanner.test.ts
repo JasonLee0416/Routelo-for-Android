@@ -45,7 +45,10 @@ const goodFrame = {
 describe('LiveOcrFrameScanner', () => {
   it('throttles frames by sampling interval before running OCR', async () => {
     let now = 1000;
-    const scanner = new LiveOcrFrameScanner({ now: () => now });
+    const scanner = new LiveOcrFrameScanner({
+      now: () => now,
+      requireQualityPass: false,
+    });
     const recognizeFrame = jest.fn(async () =>
       result([field('orderingVendorName', '꽃마루화원', 90)]),
     );
@@ -89,7 +92,10 @@ describe('LiveOcrFrameScanner', () => {
         field('recipientTel', '010-1234-5678', 88),
       ]),
     ];
-    const scanner = new LiveOcrFrameScanner({ minIntervalMs: 0 });
+    const scanner = new LiveOcrFrameScanner({
+      minIntervalMs: 0,
+      requireQualityPass: false,
+    });
     const recognizeFrame = jest.fn(async () => frames[index++]);
 
     expect(
@@ -108,7 +114,10 @@ describe('LiveOcrFrameScanner', () => {
     const pending = new Promise<OcrPipelineResult>((resolve) => {
       release = () => resolve(result([field('orderingVendorName', '꽃마루화원', 90)]));
     });
-    const scanner = new LiveOcrFrameScanner({ minIntervalMs: 0 });
+    const scanner = new LiveOcrFrameScanner({
+      minIntervalMs: 0,
+      requireQualityPass: false,
+    });
     const first = scanner.acceptFrame(goodFrame, {
       recognizeFrame: () => pending,
     });

@@ -337,7 +337,7 @@ export async function inspectReceiptImageQuality(
         ...fallback.messages,
         error instanceof Error
           ? `실측 품질 분석 실패: ${error.message}`
-          : '실측 품질 분석에 실패해 해상도 기반 추정값을 표시합니다.',
+          : '실측 품질 분석에 실패해 품질 점수를 제공하지 않습니다.',
       ],
     };
   }
@@ -348,14 +348,10 @@ export async function prepareReceiptImageForOcr(
 ): Promise<PreparedReceiptImage> {
   const action = resizeAction(input.width, input.height);
   const preparationMessages: string[] = [];
-  const beforeQuality = inspectCaptureQuality(input);
   if (Math.min(input.width || 0, input.height || 0) < OCR_MIN_SHORT_SIDE) {
     preparationMessages.push(
       'OCR 입력 이미지의 짧은 변이 작습니다. 인수증을 더 가까이, 흔들림 없이 촬영해야 합니다.',
     );
-  }
-  if (!beforeQuality.passed) {
-    preparationMessages.push(...beforeQuality.messages);
   }
 
   if (!action) {
