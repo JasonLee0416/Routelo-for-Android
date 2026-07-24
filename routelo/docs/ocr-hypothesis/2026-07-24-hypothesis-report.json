@@ -1,0 +1,1677 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Test OCR failure hypotheses against checked-in receipt images before another manual Galaxy APK test.",
+  "hypotheses": [
+    {
+      "id": 1,
+      "name": "Diagnostic/engine flags are not reliably reflected in release APKs",
+      "evidence": "This Node report cannot inspect an installed APK runtime, but it establishes the baseline that checked-in images have non-empty ML Kit results. Device 0/3 therefore needs runtime config visibility in-app.",
+      "status": "needs-apk-runtime-probe"
+    },
+    {
+      "id": 2,
+      "name": "Captured image and OCR input image may differ",
+      "evidence": "This report records original and prepared dimensions/file data for repository samples. The APK should display the same kind of image facts and OCR input preview.",
+      "status": "partially-tested"
+    },
+    {
+      "id": 3,
+      "name": "PP-OCR preprocessing/detection is failing",
+      "evidence": "The checked-in server/runtime entrypoint intentionally throws outside Android/iOS, while the native implementation depends on React Native/Expo image APIs and onnxruntime-react-native rather than a Node OCR runner.",
+      "status": "native-only-blocker"
+    },
+    {
+      "id": 4,
+      "name": "Quality gate is not predictive of OCR success",
+      "evidence": "4/8 samples passed quality but still missed at least two required parser fields or had empty OCR text.",
+      "status": "supported"
+    },
+    {
+      "id": 5,
+      "name": "Android Korean Text can read samples but app cannot use the result",
+      "evidence": "8/8 recorded ML Kit baseline samples produced non-empty text.",
+      "status": "supported"
+    },
+    {
+      "id": 6,
+      "name": "Parser fails to map raw OCR text into required fields",
+      "evidence": "4/8 samples are missing at least two required fields after current parser processing.",
+      "status": "supported"
+    }
+  ],
+  "summary": {
+    "generatedAt": "2026-07-24T13:27:39.763Z",
+    "datasetId": "routelo-receipt-samples-2026-06-21",
+    "sampleCount": 8,
+    "qualityPassCount": 8,
+    "mlkitNonEmptyCount": 8,
+    "averageMlkitNormalizedCer": 0.6025,
+    "averageMlkitTokenCoverage": 0.851,
+    "averageCurrentParserPopulatedFields": 3.5,
+    "samplesMissingAtLeastTwoRequiredFields": 4,
+    "qualityFalsePositiveCount": 4,
+    "ppOcrServerProbe": {
+      "status": "native-only-blocker",
+      "canRunOnNodeServer": false,
+      "blockingImports": [
+        "onnxruntime-react-native",
+        "expo-asset",
+        "expo-image-manipulator",
+        "react-native Image.getSize"
+      ],
+      "reason": "The checked-in server/runtime entrypoint intentionally throws outside Android/iOS, while the native implementation depends on React Native/Expo image APIs and onnxruntime-react-native rather than a Node OCR runner.",
+      "nextAction": "Use the Android APK or an emulator instrumentation harness for PP-OCR runtime numbers; keep Node reports focused on image prep, ML Kit recorded baseline, and parser regression."
+    }
+  },
+  "samples": [
+    {
+      "file": "KakaoTalk_20260621_070828835.jpg",
+      "sha256": "f6a8f334b3a62552b6aafae35bda12237a7d720cfdf86fd706b98015e01ac5c0",
+      "notes": "Folded, perspective-skewed KDFC receipt; partially occluded header and phone rows.",
+      "image": {
+        "width": 4000,
+        "height": 3000,
+        "fileSize": 1576594
+      },
+      "prepared": {
+        "width": 2400,
+        "height": 1800,
+        "normalized": true,
+        "scale": 0.6,
+        "fileSize": 1576594,
+        "minShortSidePass": true,
+        "notes": [
+          "long side normalized to 2400px"
+        ]
+      },
+      "quality": {
+        "measured": true,
+        "passed": true,
+        "score": 71,
+        "blur": 71,
+        "brightness": 60,
+        "documentCoverage": 100,
+        "skew": 38,
+        "shadow": 73,
+        "metrics": {
+          "width": 4000,
+          "height": 3000,
+          "sharpnessVariance": 124.6,
+          "luminanceMean": 0.451,
+          "paperPixelRatio": 0.674,
+          "documentBoxRatio": 0.964,
+          "shadowTileStd": 0.148,
+          "skewDegrees": -11.4
+        }
+      },
+      "recordedMlkitBaseline": {
+        "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+        "device": {
+          "manufacturer": "Google",
+          "model": "sdk_gphone64_x86_64",
+          "apiLevel": 35,
+          "release": "15"
+        },
+        "processingMs": 1299,
+        "lineCount": 41,
+        "rawTextLength": 421,
+        "empty": false,
+        "goldenCharacters": 317,
+        "predictedCharacters": 344,
+        "normalizedCer": 0.5741,
+        "tokenCoverage": 0.6849
+      },
+      "currentParser": {
+        "documentConfidence": 27,
+        "populatedFieldCount": 3,
+        "unsupportedFieldCount": 0,
+        "rawFallbackFieldCount": 0,
+        "requiredFieldCount": 3,
+        "missingRequiredFields": [
+          "deliveryDate",
+          "deliveryAddress"
+        ],
+        "fields": [
+          {
+            "key": "orderingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "orderingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productName",
+            "value": "축하 - 축하3단",
+            "confidence": 82,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "productQuantity",
+            "value": "3",
+            "confidence": 78,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "ribbonText",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryDate",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowStart",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowEnd",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "strictTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "eventTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "venueName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryAddress",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "recipientName",
+            "value": "신부 선 단비",
+            "confidence": 82,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "recipientTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "memo",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          }
+        ]
+      },
+      "recordedParserComparison": {
+        "previousPopulatedFieldCount": 3,
+        "currentPopulatedFieldCount": 3,
+        "populatedFieldDelta": 0,
+        "previousDocumentConfidence": 27,
+        "currentDocumentConfidence": 27,
+        "documentConfidenceDelta": 0
+      },
+      "hypothesisLabels": [
+        "QUALITY_GATE_FALSE_POSITIVE",
+        "PARSER_MAPPING_FAILURE",
+        "PPOCR_NATIVE_ONLY_BLOCKER"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_01.jpg",
+      "sha256": "3f9a4c2906a9628d857eefde18c220733f679bff5b0c371e749f35b864d94617",
+      "notes": "99FLOWER receipt, rotated/skewed; bottom QR area cropped.",
+      "image": {
+        "width": 4000,
+        "height": 3000,
+        "fileSize": 1545726
+      },
+      "prepared": {
+        "width": 2400,
+        "height": 1800,
+        "normalized": true,
+        "scale": 0.6,
+        "fileSize": 1545726,
+        "minShortSidePass": true,
+        "notes": [
+          "long side normalized to 2400px"
+        ]
+      },
+      "quality": {
+        "measured": true,
+        "passed": true,
+        "score": 81,
+        "blur": 75,
+        "brightness": 73,
+        "documentCoverage": 88,
+        "skew": 90,
+        "shadow": 79,
+        "metrics": {
+          "width": 4000,
+          "height": 3000,
+          "sharpnessVariance": 157.51,
+          "luminanceMean": 0.512,
+          "paperPixelRatio": 0.811,
+          "documentBoxRatio": 1,
+          "shadowTileStd": 0.115,
+          "skewDegrees": 1.9
+        }
+      },
+      "recordedMlkitBaseline": {
+        "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+        "device": {
+          "manufacturer": "Google",
+          "model": "sdk_gphone64_x86_64",
+          "apiLevel": 35,
+          "release": "15"
+        },
+        "processingMs": 521,
+        "lineCount": 33,
+        "rawTextLength": 343,
+        "empty": false,
+        "goldenCharacters": 292,
+        "predictedCharacters": 279,
+        "normalizedCer": 0.6096,
+        "tokenCoverage": 0.9306
+      },
+      "currentParser": {
+        "documentConfidence": 27,
+        "populatedFieldCount": 4,
+        "unsupportedFieldCount": 0,
+        "rawFallbackFieldCount": 0,
+        "requiredFieldCount": 3,
+        "missingRequiredFields": [
+          "deliveryDate",
+          "deliveryAddress"
+        ],
+        "fields": [
+          {
+            "key": "orderingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "orderingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productName",
+            "value": "명",
+            "confidence": 82,
+            "status": "warning",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "productQuantity",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "ribbonText",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryDate",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowStart",
+            "value": "11:00",
+            "confidence": 88,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "deliveryWindowEnd",
+            "value": "12:30",
+            "confidence": 88,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "strictTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "eventTime",
+            "value": "11:00",
+            "confidence": 86,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "venueName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryAddress",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "recipientName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "recipientTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "memo",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          }
+        ]
+      },
+      "recordedParserComparison": {
+        "previousPopulatedFieldCount": 4,
+        "currentPopulatedFieldCount": 4,
+        "populatedFieldDelta": 0,
+        "previousDocumentConfidence": 27,
+        "currentDocumentConfidence": 27,
+        "documentConfidenceDelta": 0
+      },
+      "hypothesisLabels": [
+        "QUALITY_GATE_FALSE_POSITIVE",
+        "PARSER_MAPPING_FAILURE",
+        "PPOCR_NATIVE_ONLY_BLOCKER"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_02.jpg",
+      "sha256": "de997ebb1591f894e8dff95e4885f112873275611a0e1bf8e05ac493d5761f0b",
+      "notes": "BESTFLOWER funeral receipt with handwritten blue marks and circled phone area.",
+      "image": {
+        "width": 4000,
+        "height": 3000,
+        "fileSize": 1571767
+      },
+      "prepared": {
+        "width": 2400,
+        "height": 1800,
+        "normalized": true,
+        "scale": 0.6,
+        "fileSize": 1571767,
+        "minShortSidePass": true,
+        "notes": [
+          "long side normalized to 2400px"
+        ]
+      },
+      "quality": {
+        "measured": true,
+        "passed": true,
+        "score": 83,
+        "blur": 73,
+        "brightness": 75,
+        "documentCoverage": 100,
+        "skew": 82,
+        "shadow": 86,
+        "metrics": {
+          "width": 4000,
+          "height": 3000,
+          "sharpnessVariance": 140,
+          "luminanceMean": 0.53,
+          "paperPixelRatio": 0.809,
+          "documentBoxRatio": 0.945,
+          "shadowTileStd": 0.076,
+          "skewDegrees": 3.3
+        }
+      },
+      "recordedMlkitBaseline": {
+        "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+        "device": {
+          "manufacturer": "Google",
+          "model": "sdk_gphone64_x86_64",
+          "apiLevel": 35,
+          "release": "15"
+        },
+        "processingMs": 440,
+        "lineCount": 34,
+        "rawTextLength": 461,
+        "empty": false,
+        "goldenCharacters": 372,
+        "predictedCharacters": 382,
+        "normalizedCer": 0.4704,
+        "tokenCoverage": 0.9326
+      },
+      "currentParser": {
+        "documentConfidence": 86,
+        "populatedFieldCount": 5,
+        "unsupportedFieldCount": 0,
+        "rawFallbackFieldCount": 0,
+        "requiredFieldCount": 3,
+        "missingRequiredFields": [],
+        "fields": [
+          {
+            "key": "orderingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "orderingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productName",
+            "value": "명",
+            "confidence": 82,
+            "status": "warning",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "productQuantity",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "ribbonText",
+            "value": "삼가 A의 롯을 빕니다",
+            "confidence": 76,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "deliveryDate",
+            "value": "2026-06-14",
+            "confidence": 92,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "deliveryWindowStart",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowEnd",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "strictTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "eventTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "venueName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryAddress",
+            "value": "서울 동작구 중앙대병원 장례식장 5호",
+            "confidence": 84,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "recipientName",
+            "value": "고 박희순",
+            "confidence": 82,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "recipientTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "memo",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          }
+        ]
+      },
+      "recordedParserComparison": {
+        "previousPopulatedFieldCount": 5,
+        "currentPopulatedFieldCount": 5,
+        "populatedFieldDelta": 0,
+        "previousDocumentConfidence": 86,
+        "currentDocumentConfidence": 86,
+        "documentConfidenceDelta": 0
+      },
+      "hypothesisLabels": [
+        "PPOCR_NATIVE_ONLY_BLOCKER"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_03.jpg",
+      "sha256": "7acb9bdb1f2e770b6c766ee83b2f18b64dbcf77329b84f5f9ca5452c9fce4872",
+      "notes": "BESTFLOWER funeral receipt; right side is partially cropped.",
+      "image": {
+        "width": 4000,
+        "height": 3000,
+        "fileSize": 1585544
+      },
+      "prepared": {
+        "width": 2400,
+        "height": 1800,
+        "normalized": true,
+        "scale": 0.6,
+        "fileSize": 1585544,
+        "minShortSidePass": true,
+        "notes": [
+          "long side normalized to 2400px"
+        ]
+      },
+      "quality": {
+        "measured": true,
+        "passed": true,
+        "score": 75,
+        "blur": 74,
+        "brightness": 62,
+        "documentCoverage": 100,
+        "skew": 55,
+        "shadow": 71,
+        "metrics": {
+          "width": 4000,
+          "height": 3000,
+          "sharpnessVariance": 151.5,
+          "luminanceMean": 0.47,
+          "paperPixelRatio": 0.728,
+          "documentBoxRatio": 0.951,
+          "shadowTileStd": 0.157,
+          "skewDegrees": -8.1
+        }
+      },
+      "recordedMlkitBaseline": {
+        "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+        "device": {
+          "manufacturer": "Google",
+          "model": "sdk_gphone64_x86_64",
+          "apiLevel": 35,
+          "release": "15"
+        },
+        "processingMs": 465,
+        "lineCount": 34,
+        "rawTextLength": 432,
+        "empty": false,
+        "goldenCharacters": 343,
+        "predictedCharacters": 358,
+        "normalizedCer": 0.621,
+        "tokenCoverage": 0.925
+      },
+      "currentParser": {
+        "documentConfidence": 86,
+        "populatedFieldCount": 5,
+        "unsupportedFieldCount": 0,
+        "rawFallbackFieldCount": 0,
+        "requiredFieldCount": 3,
+        "missingRequiredFields": [],
+        "fields": [
+          {
+            "key": "orderingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "orderingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productName",
+            "value": "명",
+            "confidence": 82,
+            "status": "warning",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "productQuantity",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "ribbonText",
+            "value": "부활",
+            "confidence": 76,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "deliveryDate",
+            "value": "2026-06-14",
+            "confidence": 92,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "deliveryWindowStart",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowEnd",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "strictTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "eventTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "venueName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryAddress",
+            "value": "서울 영등포구 선유로 101 교원예욱 서서울 장례식장 201호",
+            "confidence": 84,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "recipientName",
+            "value": "고인 심명철",
+            "confidence": 82,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "recipientTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "memo",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          }
+        ]
+      },
+      "recordedParserComparison": {
+        "previousPopulatedFieldCount": 5,
+        "currentPopulatedFieldCount": 5,
+        "populatedFieldDelta": 0,
+        "previousDocumentConfidence": 86,
+        "currentDocumentConfidence": 86,
+        "documentConfidenceDelta": 0
+      },
+      "hypothesisLabels": [
+        "PPOCR_NATIVE_ONLY_BLOCKER"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_04.jpg",
+      "sha256": "8d6ba35bb97b418e0556cbb8d8ada6ba3ce10dea00f170133aeb7522e0c7ef78",
+      "notes": "Naver-style order form with perspective skew and blue handwritten overlay.",
+      "image": {
+        "width": 4000,
+        "height": 3000,
+        "fileSize": 1756421
+      },
+      "prepared": {
+        "width": 2400,
+        "height": 1800,
+        "normalized": true,
+        "scale": 0.6,
+        "fileSize": 1756421,
+        "minShortSidePass": true,
+        "notes": [
+          "long side normalized to 2400px"
+        ]
+      },
+      "quality": {
+        "measured": true,
+        "passed": true,
+        "score": 70,
+        "blur": 79,
+        "brightness": 56,
+        "documentCoverage": 88,
+        "skew": 52,
+        "shadow": 63,
+        "metrics": {
+          "width": 4000,
+          "height": 3000,
+          "sharpnessVariance": 210.79,
+          "luminanceMean": 0.447,
+          "paperPixelRatio": 0.663,
+          "documentBoxRatio": 1,
+          "shadowTileStd": 0.203,
+          "skewDegrees": 8.7
+        }
+      },
+      "recordedMlkitBaseline": {
+        "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+        "device": {
+          "manufacturer": "Google",
+          "model": "sdk_gphone64_x86_64",
+          "apiLevel": 35,
+          "release": "15"
+        },
+        "processingMs": 553,
+        "lineCount": 39,
+        "rawTextLength": 416,
+        "empty": false,
+        "goldenCharacters": 317,
+        "predictedCharacters": 324,
+        "normalizedCer": 0.6088,
+        "tokenCoverage": 0.7949
+      },
+      "currentParser": {
+        "documentConfidence": 58,
+        "populatedFieldCount": 3,
+        "unsupportedFieldCount": 0,
+        "rawFallbackFieldCount": 0,
+        "requiredFieldCount": 3,
+        "missingRequiredFields": [
+          "deliveryAddress"
+        ],
+        "fields": [
+          {
+            "key": "orderingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "orderingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productName",
+            "value": "코드",
+            "confidence": 82,
+            "status": "warning",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "productQuantity",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "ribbonText",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryDate",
+            "value": "2026-06-14",
+            "confidence": 92,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "deliveryWindowStart",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowEnd",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "strictTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "eventTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "venueName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryAddress",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "recipientName",
+            "value": "명",
+            "confidence": 82,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "recipientTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "memo",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          }
+        ]
+      },
+      "recordedParserComparison": {
+        "previousPopulatedFieldCount": 3,
+        "currentPopulatedFieldCount": 3,
+        "populatedFieldDelta": 0,
+        "previousDocumentConfidence": 58,
+        "currentDocumentConfidence": 58,
+        "documentConfidenceDelta": 0
+      },
+      "hypothesisLabels": [
+        "PPOCR_NATIVE_ONLY_BLOCKER"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_05.jpg",
+      "sha256": "ca5029ba62b77cdcd72d655be7f96d13f8752f678b73b24aba65076ee2156d30",
+      "notes": "KDFC receipt with skew and handwritten overlay; some address text is hard to read.",
+      "image": {
+        "width": 4000,
+        "height": 3000,
+        "fileSize": 1622448
+      },
+      "prepared": {
+        "width": 2400,
+        "height": 1800,
+        "normalized": true,
+        "scale": 0.6,
+        "fileSize": 1622448,
+        "minShortSidePass": true,
+        "notes": [
+          "long side normalized to 2400px"
+        ]
+      },
+      "quality": {
+        "measured": true,
+        "passed": true,
+        "score": 78,
+        "blur": 75,
+        "brightness": 69,
+        "documentCoverage": 100,
+        "skew": 65,
+        "shadow": 72,
+        "metrics": {
+          "width": 4000,
+          "height": 3000,
+          "sharpnessVariance": 160.22,
+          "luminanceMean": 0.502,
+          "paperPixelRatio": 0.771,
+          "documentBoxRatio": 0.974,
+          "shadowTileStd": 0.152,
+          "skewDegrees": -6.4
+        }
+      },
+      "recordedMlkitBaseline": {
+        "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+        "device": {
+          "manufacturer": "Google",
+          "model": "sdk_gphone64_x86_64",
+          "apiLevel": 35,
+          "release": "15"
+        },
+        "processingMs": 456,
+        "lineCount": 37,
+        "rawTextLength": 409,
+        "empty": false,
+        "goldenCharacters": 326,
+        "predictedCharacters": 338,
+        "normalizedCer": 0.7301,
+        "tokenCoverage": 0.7308
+      },
+      "currentParser": {
+        "documentConfidence": 0,
+        "populatedFieldCount": 0,
+        "unsupportedFieldCount": 0,
+        "rawFallbackFieldCount": 0,
+        "requiredFieldCount": 3,
+        "missingRequiredFields": [
+          "deliveryDate",
+          "productName",
+          "deliveryAddress"
+        ],
+        "fields": [
+          {
+            "key": "orderingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "orderingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productQuantity",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "ribbonText",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryDate",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowStart",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowEnd",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "strictTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "eventTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "venueName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryAddress",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "recipientName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "recipientTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "memo",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          }
+        ]
+      },
+      "recordedParserComparison": {
+        "previousPopulatedFieldCount": 0,
+        "currentPopulatedFieldCount": 0,
+        "populatedFieldDelta": 0,
+        "previousDocumentConfidence": 0,
+        "currentDocumentConfidence": 0,
+        "documentConfidenceDelta": 0
+      },
+      "hypothesisLabels": [
+        "QUALITY_GATE_FALSE_POSITIVE",
+        "PARSER_MAPPING_FAILURE",
+        "PPOCR_NATIVE_ONLY_BLOCKER"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_06.jpg",
+      "sha256": "9316ef3e58604fde7abd1e0feb8565f76e773fa0abf86d6accafb7b1361bf9e5",
+      "notes": "KDFC receipt, mostly flat but rotated; long sender line stresses layout and wrapping.",
+      "image": {
+        "width": 4000,
+        "height": 3000,
+        "fileSize": 1539661
+      },
+      "prepared": {
+        "width": 2400,
+        "height": 1800,
+        "normalized": true,
+        "scale": 0.6,
+        "fileSize": 1539661,
+        "minShortSidePass": true,
+        "notes": [
+          "long side normalized to 2400px"
+        ]
+      },
+      "quality": {
+        "measured": true,
+        "passed": true,
+        "score": 83,
+        "blur": 75,
+        "brightness": 66,
+        "documentCoverage": 100,
+        "skew": 89,
+        "shadow": 84,
+        "metrics": {
+          "width": 4000,
+          "height": 3000,
+          "sharpnessVariance": 163.88,
+          "luminanceMean": 0.482,
+          "paperPixelRatio": 0.762,
+          "documentBoxRatio": 0.91,
+          "shadowTileStd": 0.086,
+          "skewDegrees": 2
+        }
+      },
+      "recordedMlkitBaseline": {
+        "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+        "device": {
+          "manufacturer": "Google",
+          "model": "sdk_gphone64_x86_64",
+          "apiLevel": 35,
+          "release": "15"
+        },
+        "processingMs": 465,
+        "lineCount": 38,
+        "rawTextLength": 450,
+        "empty": false,
+        "goldenCharacters": 358,
+        "predictedCharacters": 365,
+        "normalizedCer": 0.6816,
+        "tokenCoverage": 0.8824
+      },
+      "currentParser": {
+        "documentConfidence": 27,
+        "populatedFieldCount": 4,
+        "unsupportedFieldCount": 0,
+        "rawFallbackFieldCount": 0,
+        "requiredFieldCount": 3,
+        "missingRequiredFields": [
+          "deliveryDate",
+          "deliveryAddress"
+        ],
+        "fields": [
+          {
+            "key": "orderingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "orderingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productName",
+            "value": "근조 - 3단",
+            "confidence": 82,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "productQuantity",
+            "value": "3",
+            "confidence": 78,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "ribbonText",
+            "value": "삼가 조의를 표합니다",
+            "confidence": 76,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "deliveryDate",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowStart",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowEnd",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "strictTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "eventTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "venueName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryAddress",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "recipientName",
+            "value": "고인 김기회",
+            "confidence": 82,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "recipientTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "memo",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          }
+        ]
+      },
+      "recordedParserComparison": {
+        "previousPopulatedFieldCount": 4,
+        "currentPopulatedFieldCount": 4,
+        "populatedFieldDelta": 0,
+        "previousDocumentConfidence": 27,
+        "currentDocumentConfidence": 27,
+        "documentConfidenceDelta": 0
+      },
+      "hypothesisLabels": [
+        "QUALITY_GATE_FALSE_POSITIVE",
+        "PARSER_MAPPING_FAILURE",
+        "PPOCR_NATIVE_ONLY_BLOCKER"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_07.jpg",
+      "sha256": "6eb8012c226ccfc70cac39dc863ba94e9836fcf8383a68f8798641d9cd553533",
+      "notes": "99FLOWER funeral receipt with multiple phone/address fields and handwritten notes.",
+      "image": {
+        "width": 4000,
+        "height": 3000,
+        "fileSize": 1494725
+      },
+      "prepared": {
+        "width": 2400,
+        "height": 1800,
+        "normalized": true,
+        "scale": 0.6,
+        "fileSize": 1494725,
+        "minShortSidePass": true,
+        "notes": [
+          "long side normalized to 2400px"
+        ]
+      },
+      "quality": {
+        "measured": true,
+        "passed": true,
+        "score": 81,
+        "blur": 74,
+        "brightness": 62,
+        "documentCoverage": 100,
+        "skew": 89,
+        "shadow": 79,
+        "metrics": {
+          "width": 4000,
+          "height": 3000,
+          "sharpnessVariance": 150.57,
+          "luminanceMean": 0.47,
+          "paperPixelRatio": 0.734,
+          "documentBoxRatio": 0.904,
+          "shadowTileStd": 0.113,
+          "skewDegrees": 2
+        }
+      },
+      "recordedMlkitBaseline": {
+        "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+        "device": {
+          "manufacturer": "Google",
+          "model": "sdk_gphone64_x86_64",
+          "apiLevel": 35,
+          "release": "15"
+        },
+        "processingMs": 401,
+        "lineCount": 37,
+        "rawTextLength": 396,
+        "empty": false,
+        "goldenCharacters": 326,
+        "predictedCharacters": 318,
+        "normalizedCer": 0.5245,
+        "tokenCoverage": 0.9268
+      },
+      "currentParser": {
+        "documentConfidence": 55,
+        "populatedFieldCount": 4,
+        "unsupportedFieldCount": 0,
+        "rawFallbackFieldCount": 0,
+        "requiredFieldCount": 3,
+        "missingRequiredFields": [
+          "deliveryDate"
+        ],
+        "fields": [
+          {
+            "key": "orderingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "orderingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "fulfillingVendorTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "productName",
+            "value": "영",
+            "confidence": 82,
+            "status": "warning",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "productQuantity",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "ribbonText",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryDate",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryWindowStart",
+            "value": "17:00",
+            "confidence": 88,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "deliveryWindowEnd",
+            "value": "19:00",
+            "confidence": 88,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "strictTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "eventTime",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "venueName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "deliveryAddress",
+            "value": "서울 구로구 고려대 구로병원 장례식장 105호",
+            "confidence": 84,
+            "status": "review",
+            "provenance": "sourceText"
+          },
+          {
+            "key": "recipientName",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "recipientTel",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          },
+          {
+            "key": "memo",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "provenance": "missing"
+          }
+        ]
+      },
+      "recordedParserComparison": {
+        "previousPopulatedFieldCount": 4,
+        "currentPopulatedFieldCount": 4,
+        "populatedFieldDelta": 0,
+        "previousDocumentConfidence": 55,
+        "currentDocumentConfidence": 55,
+        "documentConfidenceDelta": 0
+      },
+      "hypothesisLabels": [
+        "PPOCR_NATIVE_ONLY_BLOCKER"
+      ]
+    }
+  ]
+}
