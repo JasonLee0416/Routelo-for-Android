@@ -6,7 +6,12 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "backgroundColor": "#F8F7F4",
     "userInterfaceStyle": "light",
+    "androidStatusBar": {
+      "backgroundColor": "#F8F7F4",
+      "barStyle": "dark-content"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.jasonlee0312.routelo",
@@ -23,7 +28,7 @@
         "android.permission.POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F8F7F4",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -38,7 +43,8 @@
       "onnxruntime-react-native",
       "./plugins/withAndroidPpocrFrameRecognizer",
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-asset"
     ]
   }
 }

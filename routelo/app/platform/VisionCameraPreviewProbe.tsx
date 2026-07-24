@@ -28,6 +28,7 @@ import {
   inspectAndroidPpocrFrameBufferRecognizer,
   loadAndroidPpocrFrameBufferRecognizer,
 } from './androidPpocrFrameBufferRecognizer';
+import { LIGHT } from '../theme/palette';
 
 declare const require: (moduleName: string) => unknown;
 
@@ -381,8 +382,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#BCD3FF',
-    backgroundColor: '#EEF5FF',
+    borderColor: LIGHT.outline,
+    backgroundColor: LIGHT.primaryContainer,
     padding: 14,
   },
   headerRow: {
@@ -392,24 +393,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
-    color: '#153B7A',
+    color: LIGHT.onPrimaryContainer,
     fontSize: 15,
     fontWeight: '800',
   },
   caption: {
     marginTop: 4,
-    color: '#4B638B',
+    color: LIGHT.textMuted,
     fontSize: 12,
     lineHeight: 17,
   },
   badge: {
     borderRadius: 999,
-    backgroundColor: '#1D4ED8',
+    backgroundColor: LIGHT.primary,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: LIGHT.onPrimary,
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.7,
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
     height: 210,
     overflow: 'hidden',
     borderRadius: 20,
-    backgroundColor: '#0B1220',
+    backgroundColor: LIGHT.emphasis,
   },
   emptyPreview: {
     flex: 1,
@@ -427,14 +428,14 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   emptyTitle: {
-    color: '#E8EEF8',
+    color: LIGHT.onEmphasis,
     fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',
   },
   emptyCaption: {
     marginTop: 6,
-    color: '#A9B7D0',
+    color: LIGHT.onEmphasisMuted,
     fontSize: 12,
     textAlign: 'center',
   },
@@ -445,26 +446,26 @@ const styles = StyleSheet.create({
   },
   statusText: {
     borderRadius: 999,
-    backgroundColor: '#DCEAFF',
-    color: '#244E8F',
+    backgroundColor: LIGHT.primaryContainer,
+    color: LIGHT.onPrimaryContainer,
     fontSize: 11,
     fontWeight: '700',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   errorText: {
-    color: '#B42318',
+    color: LIGHT.danger,
     fontSize: 12,
     fontWeight: '700',
   },
   warningText: {
-    color: '#B54708',
+    color: LIGHT.warning,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
   },
   frameText: {
-    color: '#244E8F',
+    color: LIGHT.onPrimaryContainer,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
@@ -472,11 +473,11 @@ const styles = StyleSheet.create({
   permissionButton: {
     alignItems: 'center',
     borderRadius: 16,
-    backgroundColor: '#1D4ED8',
+    backgroundColor: LIGHT.primary,
     paddingVertical: 12,
   },
   permissionButtonText: {
-    color: '#FFFFFF',
+    color: LIGHT.onPrimary,
     fontSize: 14,
     fontWeight: '800',
   },

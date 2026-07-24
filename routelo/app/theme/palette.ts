@@ -1,0 +1,92 @@
+export type Palette = {
+  primary: string;
+  onPrimary: string;
+  primaryContainer: string;
+  onPrimaryContainer: string;
+  navy: string;
+  emphasis: string;
+  onEmphasis: string;
+  onEmphasisMuted: string;
+  background: string;
+  surface: string;
+  surfaceRaised: string;
+  surfaceAlt: string;
+  outline: string;
+  outlineStrong: string;
+  text: string;
+  textMuted: string;
+  success: string;
+  successBg: string;
+  warning: string;
+  warningBg: string;
+  danger: string;
+  dangerBg: string;
+  glass: string;
+  glassStrong: string;
+  glassBorder: string;
+  glassHighlight: string;
+  navGlass: string;
+  shadow: string;
+};
+
+export const LIGHT: Palette = {
+  primary: '#0047FF',
+  onPrimary: '#FFFFFF',
+  primaryContainer: '#E1E8FF',
+  onPrimaryContainer: '#002B99',
+  navy: '#171717',
+  emphasis: '#171717',
+  onEmphasis: '#FFFFFF',
+  onEmphasisMuted: '#BFCBE0',
+  background: '#F8F7F4',
+  surface: '#FFFFFF',
+  surfaceRaised: '#FFFFFF',
+  surfaceAlt: '#EFEEE9',
+  outline: '#E3E1DA',
+  outlineStrong: '#E3E1DA',
+  text: '#171717',
+  textMuted: '#6E6B64',
+  success: '#207A33',
+  successBg: '#E6F2E9',
+  warning: '#B26A00',
+  warningBg: '#F6ECD9',
+  danger: '#C7261D',
+  dangerBg: '#F7E4E1',
+  glass: '#FFFFFF',
+  glassStrong: '#FFFFFF',
+  glassBorder: '#E3E1DA',
+  glassHighlight: '#FFFFFF',
+  navGlass: '#FFFFFF',
+  shadow: '#171717',
+};
+
+export const DARK: Palette = {
+  primary: '#21F1A8',
+  onPrimary: '#05231A',
+  primaryContainer: '#0E2C22',
+  onPrimaryContainer: '#8CF3D0',
+  navy: '#F5F4F1',
+  emphasis: '#292928',
+  onEmphasis: '#FFFFFF',
+  onEmphasisMuted: '#C9C6BE',
+  background: '#171717',
+  surface: '#1F1F1E',
+  surfaceRaised: '#1F1F1E',
+  surfaceAlt: '#292928',
+  outline: '#3A3A38',
+  outlineStrong: '#3A3A38',
+  text: '#F5F4F1',
+  textMuted: '#A6A39C',
+  success: '#34C759',
+  successBg: '#123322',
+  warning: '#FFC24D',
+  warningBg: '#33280F',
+  danger: '#FF5A4F',
+  dangerBg: '#33191A',
+  glass: '#1F1F1E',
+  glassStrong: '#1F1F1E',
+  glassBorder: '#3A3A38',
+  glassHighlight: '#292928',
+  navGlass: '#1F1F1E',
+  shadow: '#171717',
+};

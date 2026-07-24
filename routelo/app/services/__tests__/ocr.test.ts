@@ -63,6 +63,14 @@ describe('OCR zero-fabrication guard', () => {
       fullText: DEMO_RECEIPT_TEXT,
       lines: [{ text: '주문번호 FL-20260621-1842' }],
       processingMs: 321,
+      diagnostics: {
+        preprocessProfileId: 'ocr-recovery-test',
+        selectedOrientationDegrees: 0,
+        regionCount: 12,
+        acceptedLineCount: 8,
+        rawTextLength: DEMO_RECEIPT_TEXT.length,
+        orientationCandidates: [],
+      },
     });
 
     const result = await runReceiptOcr({
@@ -78,6 +86,11 @@ describe('OCR zero-fabrication guard', () => {
     expect(result.processingMs).toBe(321);
     expect(result.rawText).toContain('FL-20260621-1842');
     expect(result.recognizedLines?.[0].text).toContain('주문번호');
+    expect(result.ocrDiagnostics).toMatchObject({
+      preprocessProfileId: 'ocr-recovery-test',
+      regionCount: 12,
+      acceptedLineCount: 8,
+    });
   });
 
   it('fails closed when OCR output has no usable receipt evidence', async () => {
@@ -94,6 +107,30 @@ describe('OCR zero-fabrication guard', () => {
         height: 1920,
       }, undefined, recognizer),
     ).rejects.toBeInstanceOf(OcrNoTextDetectedError);
+  });
+
+  it('includes detector diagnostics when PP-OCR returns no text', async () => {
+    const recognizer = jest.fn().mockResolvedValue({
+      fullText: '',
+      lines: [],
+      processingMs: 33,
+      diagnostics: {
+        preprocessProfileId: 'ocr-recovery-test',
+        selectedOrientationDegrees: 0,
+        regionCount: 0,
+        acceptedLineCount: 0,
+        rawTextLength: 0,
+        orientationCandidates: [],
+      },
+    });
+
+    await expect(
+      runReceiptOcr({
+        uri: 'file:///empty-receipt.jpg',
+        width: 1440,
+        height: 1920,
+      }, undefined, recognizer),
+    ).rejects.toThrow(/detectedRegions=0/);
   });
 
   it('uses PP-OCR geometry to associate labels with values', async () => {
