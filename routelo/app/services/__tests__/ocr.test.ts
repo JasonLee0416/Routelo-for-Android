@@ -245,3 +245,76 @@ describe('OCR registry alias fallback (dead-code activation)', () => {
     expect(ordering?.status).toBe('missing');
   });
 });
+
+// 완벽 OCR 텍스트(골든 정답)에서도 드러난 파싱 버그를 고정한다. 실제 인수증
+// 8장에서 관찰된 표면형을 인라인 픽스처로 옮겨 회귀를 막는다.
+describe('OCR single-image parsing quality (golden-observed)', () => {
+  const field = (result: ReturnType<typeof parseReceiptText>, key: string) =>
+    result.fields.find((item) => item.key === key);
+
+  it('라벨 경계: "상품코드"를 상품명으로 오인하지 않고 "배송상품"을 택한다', () => {
+    const text = ['상품코드: TFP-NO 100 OPT', '배송상품: 근조화환 1개 (새꽃정 풀화환)'].join(
+      '\n',
+    );
+    expect(field(parseReceiptText(text, quality), 'productName')?.value).toBe(
+      '근조화환 1개 (새꽃정 풀화환)',
+    );
+  });
+
+  it('2차 라벨 제거: "배달장소: 주소 서울…"에서 "주소"를 걷어낸다', () => {
+    const text = '배달장소: 주소 서울 동작구 흑석로 102 중앙대병원 장례식장 5호';
+    expect(field(parseReceiptText(text, quality), 'deliveryAddress')?.value).toBe(
+      '서울 동작구 흑석로 102 중앙대병원 장례식장 5호',
+    );
+  });
+
+  it('리본 중첩 라벨: "리본: 경조사어: 삼가…"에서 메시지만 남긴다', () => {
+    const text = '리본: 경조사어: 삼가 고인의 명복을 빕니다';
+    expect(field(parseReceiptText(text, quality), 'ribbonText')?.value).toBe(
+      '삼가 고인의 명복을 빕니다',
+    );
+  });
+
+  it('[불명] 토큰만 남는 값은 채우지 않는다', () => {
+    const result = parseReceiptText('인수자명: [불명]', quality);
+    const recipient = field(result, 'recipientName');
+    expect(recipient?.value).toBe('');
+    expect(recipient?.status).toBe('missing');
+  });
+
+  it('수령자 별칭 확장: "받으실분"을 인식한다', () => {
+    expect(
+      field(parseReceiptText('받으실분: 유기열 부친상', quality), 'recipientName')
+        ?.value,
+    ).toBe('유기열 부친상');
+  });
+
+  it('화원명 복구(KDFC 대시형): 괄호 안 화원명을 뽑고 review로 둔다', () => {
+    const result = parseReceiptText(
+      '발주화원: 경기 의정부시-경기의정21호(임플라워)-010-5898-9543',
+      quality,
+    );
+    const vendor = field(result, 'orderingVendorName');
+    expect(vendor?.value).toBe('임플라워');
+    expect(vendor?.status).toBe('review');
+  });
+
+  it('화원명 복구(네이버 대괄호형): 지역태그·HP괄호를 제거한다', () => {
+    expect(
+      field(
+        parseReceiptText(
+          '발주회원: [서울 마포구] 가든스로즈블리 (HP:010-4482-9119)',
+          quality,
+        ),
+        'orderingVendorName',
+      )?.value,
+    ).toBe('가든스로즈블리');
+  });
+
+  it('깨끗한 화원명은 그대로 둔다(정제 부작용 없음)', () => {
+    expect(
+      field(parseReceiptText('발주처: KDFC한길화원', quality), 'orderingVendorName')
+        ?.value,
+    ).toBe('KDFC한길화원');
+  });
+});
