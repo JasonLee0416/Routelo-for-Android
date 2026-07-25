@@ -1,5 +1,12 @@
 export type OcrPrimaryEngine = 'ppocrv5' | 'android-korean-text';
 
+// 주 엔진 결정의 단일 진실. config와 recognizer 게이트가 이 함수를 공유해
+// drift를 막는다. 기본은 온디바이스 한국어 엔진, PP-OCR은 명시 opt-in
+// (docs/ocr-benchmark/2026-07-25-device-engine-verification.md).
+export function resolvePrimaryEngine(engineEnv?: string): OcrPrimaryEngine {
+  return engineEnv === 'ppocrv5' ? 'ppocrv5' : 'android-korean-text';
+}
+
 type OcrRuntimeEnv = {
   EXPO_PUBLIC_ROUTELO_OCR_PROFILE?: string;
   EXPO_PUBLIC_ROUTELO_OCR_ENGINE?: string;
@@ -24,17 +31,16 @@ const directDiagnostics =
   typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_ROUTELO_OCR_DIAGNOSTICS : undefined;
 
 const profile = directProfile || currentEnv.EXPO_PUBLIC_ROUTELO_OCR_PROFILE || 'stable-mobile';
-const primaryEngine =
-  (directEngine || currentEnv.EXPO_PUBLIC_ROUTELO_OCR_ENGINE) === 'android-korean-text'
-    ? 'android-korean-text'
-    : 'ppocrv5';
+const primaryEngine = resolvePrimaryEngine(
+  directEngine || currentEnv.EXPO_PUBLIC_ROUTELO_OCR_ENGINE,
+);
 const diagnostics =
   (directDiagnostics || currentEnv.EXPO_PUBLIC_ROUTELO_OCR_DIAGNOSTICS) === '1' ||
   profile === 'ocr-recovery-test';
 
 export const OCR_RUNTIME_CONFIG = {
   profile,
-  primaryEngine: profile === 'ocr-recovery-test' ? 'android-korean-text' : primaryEngine,
+  primaryEngine,
   diagnostics,
   comparePpOcr: diagnostics,
   source: 'expo-public-env-with-safe-fallback',

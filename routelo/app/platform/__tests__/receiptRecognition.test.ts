@@ -12,21 +12,31 @@ describe('receiptRecognitionCapability', () => {
     }
   });
 
-  test('uses the same pinned PP-OCR model on Android', () => {
+  test('defaults to the on-device Korean text recognizer on Android', () => {
+    // 기본 주 엔진은 온디바이스 한국어 텍스트 인식(실기기 확증: PP-OCR는 no-text).
     delete process.env.EXPO_PUBLIC_ROUTELO_OCR_ENGINE;
     expect(receiptRecognitionCapability('android')).toEqual({
       available: true,
-      engine: 'ppocrv5',
-      modelVersion: 'rapidocr-v3.8.0-ppocrv5',
+      engine: 'mlkit-v2-korean',
+      modelVersion: ANDROID_KOREAN_TEXT_MODEL_VERSION,
     });
   });
 
-  test('can switch Android test APKs to the official Korean text recognizer', () => {
+  test('keeps the on-device Korean recognizer when explicitly selected', () => {
     process.env.EXPO_PUBLIC_ROUTELO_OCR_ENGINE = 'android-korean-text';
     expect(receiptRecognitionCapability('android')).toEqual({
       available: true,
       engine: 'mlkit-v2-korean',
       modelVersion: ANDROID_KOREAN_TEXT_MODEL_VERSION,
+    });
+  });
+
+  test('can force PP-OCR as the Android engine via opt-in env', () => {
+    process.env.EXPO_PUBLIC_ROUTELO_OCR_ENGINE = 'ppocrv5';
+    expect(receiptRecognitionCapability('android')).toEqual({
+      available: true,
+      engine: 'ppocrv5',
+      modelVersion: 'rapidocr-v3.8.0-ppocrv5',
     });
   });
 
