@@ -3122,6 +3122,9 @@ function OcrScannerModal({
   const [addressVerification, setAddressVerification] =
     useState<AddressVerificationResult>();
   const [liveSession, setLiveSession] = useState(createInitialLiveOcrSession);
+  // 갤러리에서 고른 단일 이미지는 라이브 누적(다중 프레임 안정화)을 우회하고
+  // 그 한 장의 OCR 결과로 바로 검토 화면으로 간다(#124). 카메라 연속 촬영만 누적.
+  const [captureFromGallery, setCaptureFromGallery] = useState(false);
   const liveSummary = summarizeLiveOcrSession(liveSession);
   const deliveryAddressValue =
     fields.find((item) => item.key === 'deliveryAddress')?.value || '';
@@ -3140,6 +3143,7 @@ function OcrScannerModal({
     setVendorCheck(undefined);
     setAddressVerification(undefined);
     setLiveSession(createInitialLiveOcrSession());
+    setCaptureFromGallery(false);
   };
 
   const setStageAnimated = (next: ScanStage) => {
@@ -3166,6 +3170,7 @@ function OcrScannerModal({
       Alert.alert('권한 필요', '인수증을 촬영하거나 불러오려면 사진 접근 권한이 필요합니다.');
       return;
     }
+    setCaptureFromGallery(!camera);
     const picked = camera
       ? await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
@@ -3291,6 +3296,20 @@ function OcrScannerModal({
           undefined,
           result?.quality,
         );
+      }
+      if (captureFromGallery) {
+        // 갤러리 단일 이미지: 다중 프레임 안정화(임계·supportCount)를 우회하고
+        // 이 한 장의 OCR 결과를 그대로 검토 화면으로 보낸다(#124). 유저가 갤러리
+        // 인수증 1장으로 즉시 인식하는 실사용 경로다. 약한/부분 필드는 검토
+        // 화면에서 사용자가 확인·보정한다(자동 등록 아님, zero-fabrication 유지).
+        // 앞서 카메라로 누적한 aggregate가 있어도 단일샷 결과로 대체한다(의도된 시맨틱).
+        setAggregateResult(next);
+        setLiveSession(createInitialLiveOcrSession());
+        setResult(next);
+        setFields(next.fields);
+        setStageAnimated('review');
+        verifyForReview(next.fields);
+        return;
       }
       const merged = mergeOcrResult(aggregateResult, next);
       const nextSession = updateLiveOcrSession(liveSession, next);
