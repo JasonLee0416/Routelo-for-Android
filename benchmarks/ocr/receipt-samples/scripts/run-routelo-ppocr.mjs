@@ -48,10 +48,15 @@ for (let index = 2; index < process.argv.length; index += 1) {
 }
 
 const profileId = args.get('profile') || 'stable-mobile';
-const profile =
-  profileId === 'high-res-preprocess'
-    ? PP_OCR_PREPROCESS_PROFILES.highResPreprocess
-    : PP_OCR_PREPROCESS_PROFILES.stableMobile;
+// 프로덕션과 동일한 id로 프로파일을 고른다(값 오타 방지).
+const profile = Object.values(PP_OCR_PREPROCESS_PROFILES).find(
+  (entry) => entry.id === profileId,
+);
+if (!profile) {
+  const ids = Object.values(PP_OCR_PREPROCESS_PROFILES).map((p) => p.id);
+  console.error(`unknown profile "${profileId}". known: ${ids.join(', ')}`);
+  process.exit(2);
+}
 const outDir = join(repoRoot, args.get('out') || `tmp/ocr-runs/routelo-${profileId}`);
 
 const manifest = JSON.parse(
@@ -239,6 +244,8 @@ async function recognize(imagePath) {
     mapHeight,
     source.width,
     source.height,
+    // 프로파일별 DB 후처리 튜닝(threshold/unclip/maxRegions)을 앱과 동일하게 넘긴다.
+    profile.dbPostprocess,
   );
 
   const lines = [];
