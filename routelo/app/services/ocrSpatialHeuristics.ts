@@ -72,16 +72,17 @@ const REQUIRED = new Set<OcrFieldKey>([
   'deliveryAddress',
 ]);
 
-// 8샘플 243조합 스윕의 "최적값"이 아니라 각 범위의 중간값을 의도적으로 쓴다.
-// 8장에 맞춘 최적값은 과적합 위험이 크다. 어차피 공간 채움 값은 항상 review
-// 상태로 남으므로 상수 미세 튜닝이 신뢰 판정에 직접 영향을 주지 않는다.
-// (스윕 리포트의 수치는 이 중간값 설정이 아닌 최적값 기준이라 프로덕션과 다름.)
+// 243조합 스윕의 최적값. Leave-One-Out 교차검증(--cross-validate)에서 과적합
+// 격차 0, 8 fold 모두 동일 상수 선택으로 견고성이 입증됐고, 프로덕션이 쓰던
+// 중간값(loose hits 23)보다 최적값(28)이 높았다. 근거:
+// docs/ocr-hypothesis/2026-07-25-roi-heuristic-cross-validation.md.
+// 공간 채움 값은 항상 review 상태(#118)라 이 상수는 후보 회복률에만 영향한다.
 export const DEFAULT_SPATIAL_HEURISTIC_CONSTANTS: SpatialHeuristicConstants = {
-  sameRowYRatio: 0.022,
-  xLeftSlackRatio: 0.028,
-  xRightGrowRatio: 0.72,
-  yUpSlackRatio: 0.082,
-  yDownGrowRatio: 0.105,
+  sameRowYRatio: 0.018,
+  xLeftSlackRatio: 0.015,
+  xRightGrowRatio: 0.55,
+  yUpSlackRatio: 0.12,
+  yDownGrowRatio: 0.07,
   maxCandidatesPerAnchor: 3,
 };
 

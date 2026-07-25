@@ -246,6 +246,7 @@ const {
   extractSpatialFieldCandidates,
 } = compileAppOcrModules();
 
+function runSweep() {
 const baselineBySample = [];
 const sweepResults = [];
 
@@ -411,3 +412,113 @@ console.log(JSON.stringify({
   bestAggregate: best.aggregate,
   deltas: report.deltas,
 }, null, 2));
+}
+
+// --- Leave-One-Out 교차검증 ------------------------------------------------
+// 243조합을 8샘플로 뽑으면 그 8장에만 맞는 상수를 고를 위험(과적합)이 있다.
+// 각 샘플을 한 번씩 홀드아웃으로 빼고 나머지 7로 최적 상수를 뽑은 뒤, 뺀 샘플에서
+// 평가한다. in-sample 성능과 홀드아웃 성능의 격차가 과적합의 크기다.
+
+function evaluateConfigCv(config, samples) {
+  let score = 0;
+  let goldenLooseHits = 0;
+  let requiredPopulated = 0;
+  for (const sample of samples) {
+    const expected = extractExpectedFields(sample);
+    const baseline = parseReceiptText(
+      sample.fullText,
+      qualityFixture(sample.width, sample.height),
+    );
+    const spatial = applySpatialOcrFieldHeuristics(
+      baseline,
+      sample.lines,
+      { width: sample.width, height: sample.height },
+      config,
+    );
+    const summary = summarizeParser(spatial, expected);
+    score += scoreSummary(summary);
+    goldenLooseHits += summary.goldenLooseHits;
+    requiredPopulated += summary.requiredPopulated;
+  }
+  return { score, goldenLooseHits, requiredPopulated };
+}
+
+function bestConfigFor(samples, grid) {
+  let best = null;
+  for (const config of grid) {
+    const evaluated = evaluateConfigCv(config, samples);
+    if (!best || evaluated.score > best.evaluated.score) {
+      best = { config, evaluated };
+    }
+  }
+  return best;
+}
+
+function runLeaveOneOut() {
+  const samples = nativeBaseline.results;
+  const n = samples.length;
+  const grid = constantGrid();
+
+  // 전체로 뽑은 best를 전체에서 평가 = 낙관적 상한(과적합 포함).
+  const inSample = bestConfigFor(samples, grid);
+  const productionMidpoint = {
+    sameRowYRatio: 0.022,
+    xLeftSlackRatio: 0.028,
+    xRightGrowRatio: 0.72,
+    yUpSlackRatio: 0.082,
+    yDownGrowRatio: 0.105,
+    maxCandidatesPerAnchor: 3,
+  };
+  const productionHits = evaluateConfigCv(productionMidpoint, samples).goldenLooseHits;
+
+  let looHeldoutHits = 0;
+  let inSampleHeldoutHits = 0;
+  const foldConfigs = [];
+  for (let i = 0; i < n; i += 1) {
+    const train = samples.filter((_, j) => j !== i);
+    const test = [samples[i]];
+    const foldBest = bestConfigFor(train, grid);
+    foldConfigs.push(foldBest.config);
+    looHeldoutHits += evaluateConfigCv(foldBest.config, test).goldenLooseHits;
+    inSampleHeldoutHits += evaluateConfigCv(inSample.config, test).goldenLooseHits;
+  }
+
+  // 상수별 fold 간 선택값 종류 수. 1이면 모든 fold가 같은 값을 골랐다는 뜻(안정),
+  // 3이면 fold마다 제각각(불안정 = 과적합 신호).
+  const keys = [
+    'sameRowYRatio',
+    'xLeftSlackRatio',
+    'xRightGrowRatio',
+    'yUpSlackRatio',
+    'yDownGrowRatio',
+  ];
+  const foldConfigStability = {};
+  for (const key of keys) {
+    foldConfigStability[key] = new Set(foldConfigs.map((c) => c[key])).size;
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        method: 'leave-one-out cross-validation of the 243-combo ROI sweep',
+        samples: n,
+        gridSize: grid.length,
+        inSampleBestConfig: inSample.config,
+        inSampleTotalLooseHits: inSample.evaluated.goldenLooseHits,
+        looHeldoutLooseHits: looHeldoutHits,
+        inSampleBestHeldoutLooseHits: inSampleHeldoutHits,
+        productionMidpointLooseHits: productionHits,
+        overfitGap: inSample.evaluated.goldenLooseHits - looHeldoutHits,
+        foldConfigStability,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+if (process.argv.includes('--cross-validate')) {
+  runLeaveOneOut();
+} else {
+  runSweep();
+}
