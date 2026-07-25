@@ -6,6 +6,10 @@ import { matchVenue, VenueEntry } from './venueGazetteer';
 const funeral: VenueEntry[] = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'data/seoul-funeral.json'), 'utf8'),
 );
+const wedding: VenueEntry[] = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'data/seoul-wedding.json'), 'utf8'),
+);
+const all = [...funeral, ...wedding];
 
 // 골든 인수증의 실제 배송지 원문 → 기대 정규 장소명(부분)
 const GOLDEN = [
@@ -39,5 +43,40 @@ describe('seoul-funeral gazetteer (real data)', () => {
 
   it('무관한 배송지는 매칭하지 않는다', () => {
     expect(matchVenue('서울 강남구 테헤란로 스타벅스', funeral)).toHaveLength(0);
+  });
+});
+
+describe('seoul-wedding gazetteer (real data)', () => {
+  it('JSON이 유효하고 wedding 타입 필수 필드를 가진다', () => {
+    expect(wedding.length).toBeGreaterThanOrEqual(80);
+    for (const v of wedding) {
+      expect(typeof v.name).toBe('string');
+      expect(Array.isArray(v.aliases)).toBe(true);
+      expect(v.type).toBe('wedding');
+    }
+  });
+
+  const WED = [
+    { ocr: '서울 강남구 선릉로 757 더채플앳청담 3층', expect: '더채플앳청담' },
+    { ocr: '서울 영등포구 국제금융로 10 콘래드 서울 그랜드볼룸', expect: '콘래드 서울' },
+    { ocr: '잠실 롯데호텔월드 크리스탈볼룸', expect: '롯데호텔월드' },
+    { ocr: '서울 중구 장충 신라호텔 다이너스티홀', expect: '신라호텔' },
+  ];
+
+  it('예식장 배송지가 올바른 웨딩홀로 매칭된다', () => {
+    for (const g of WED) {
+      const m = matchVenue(g.ocr, wedding, { type: 'wedding' });
+      const top = m[0];
+      console.log(
+        `${g.ocr.slice(0, 32).padEnd(34)} → ${top ? `${top.entry.name} (${top.score.toFixed(2)})` : '없음'}`,
+      );
+      expect(top?.entry.name).toContain(g.expect);
+    }
+  });
+
+  it('장례식장+예식장 통합 사전에서도 종류를 필터해 정확 매칭', () => {
+    // 통합 사전에 던져도 장례식장 질의는 장례식장으로.
+    const m = matchVenue('중앙대병원 장례식장 5호', all, { type: 'funeral' });
+    expect(m[0]?.entry.name).toContain('중앙대학교병원');
   });
 });
