@@ -242,29 +242,44 @@ function labelPattern(alias: string) {
 
 // 값 앞에 다시 붙은 2차 라벨을 걷어낸다. 실제 인수증은 "배달장소: 주소 서울…",
 // "인수자: 받는분 고 박희순", "리본: 경조사어: 삼가…" 처럼 라벨을 중첩 표기한다.
-const SECONDARY_LABELS = [
+// ANY: 공백만으로도 제거해도 안전한 라벨(실제 값이 이 토큰으로 시작할 일이 거의 없음).
+const SECONDARY_LABELS_ANY = [
   '주소',
   '받는분',
   '받는 분',
   '받으실분',
   '받으실 분',
   '경조사어',
-  '리본문구',
-  '리본',
-  '성명',
-  '이름',
 ];
+// COLON: 실제 값이 이 토큰으로 시작할 수 있어(예: 화원명 "리본 플라워", 이름) 콜론
+// 구분자가 명시된 경우에만 제거한다.
+const SECONDARY_LABELS_COLON = ['리본문구', '리본', '성명', '이름'];
+
+function labelPatternColon(alias: string) {
+  const core = alias.trim().split(/\s+/).map(escapeRegExp).join('\\s*');
+  return new RegExp(`^\\s*${core}\\s*[:：|/]\\s*`, 'i');
+}
 
 function stripRedundantLabels(value: string) {
   let current = value.trim();
-  for (let guard = 0; guard < SECONDARY_LABELS.length + 2; guard += 1) {
+  for (let guard = 0; guard < 10; guard += 1) {
     let stripped = false;
-    for (const label of SECONDARY_LABELS) {
+    for (const label of SECONDARY_LABELS_ANY) {
       const match = current.match(labelPattern(label));
       if (match && match[0].length < current.length) {
         current = current.slice(match[0].length).trim();
         stripped = true;
         break;
+      }
+    }
+    if (!stripped) {
+      for (const label of SECONDARY_LABELS_COLON) {
+        const match = current.match(labelPatternColon(label));
+        if (match && match[0].length < current.length) {
+          current = current.slice(match[0].length).trim();
+          stripped = true;
+          break;
+        }
       }
     }
     if (!stripped) break;
@@ -275,11 +290,14 @@ function stripRedundantLabels(value: string) {
 // [불명](unknownToken)만 남는 값은 사실상 빈 값이다 — 그대로 채우면 "명: [불명]"
 // 같은 쓰레기가 필드에 들어간다. 불명 토큰을 제거해 알맹이가 없으면 빈 문자열.
 function voidIfUnknown(value: string) {
-  const residue = value
-    .replace(/\[?\s*불명\s*\]?/g, '')
-    .replace(/[·・.,/\-\s]+/g, '')
+  const withoutUnknown = value.replace(/\[?\s*불명\s*\]?/g, '');
+  const residue = withoutUnknown.replace(/[·・.,/\-\s]+/g, '').trim();
+  if (!residue) return '';
+  // 불명 토큰 제거 후 남는 고아 구분자/중복 공백을 정리한다("070-[불명]"→"070").
+  return withoutUnknown
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s·・.,/\-]+|[\s·・.,/\-]+$/g, '')
     .trim();
-  return residue ? value.replace(/\[?\s*불명\s*\]?/g, '').trim() : '';
 }
 
 function cleanFieldValue(value: string) {
@@ -293,27 +311,39 @@ function cleanFieldValue(value: string) {
 // 보수적으로 뽑아낸다(추출 실패 시 원본 유지 → 기존 검증기가 판단). 값은 review.
 const FLORIST_SUFFIX = /(?:화원|플라워|농원|꽃집|꽃|원예|원|센터|flower)$/i;
 
+// 담당자·지점 등 화원명이 아닌 괄호 내용은 제외한다(예: "행복플라워(대표 김철수)"
+// 에서 대표명을 화원명으로 잘못 뽑지 않도록).
+const NON_FLORIST_PAREN = /HP|TEL|FAX|전화|팩스|연락|대표|담당|직통|사장|실장|점장/i;
+
 function refineVendorCandidate(raw: string): string {
   const value = raw.trim();
   if (!value) return value;
-  // 1) 괄호 안 화원명 우선(마지막 괄호부터). HP/전화/숫자 괄호는 제외.
+  // 1) 괄호 안 화원명 우선(마지막 괄호부터). 화원 접미사가 있는 것만 채택 —
+  //    접미사가 없으면 지점/담당명일 수 있어 잘못 뽑는다.
   const parens = [...value.matchAll(/[（(]\s*([^()（）]+?)\s*[)）]/g)].map((m) =>
     m[1].trim(),
   );
   const floristParen = parens
-    .filter((p) => !/\d/.test(p) && !/HP|TEL|FAX|전화|팩스|연락/i.test(p))
+    .filter((p) => !/\d/.test(p) && !NON_FLORIST_PAREN.test(p))
     .reverse()
-    .find((p) => /[가-힣]/.test(p) && (FLORIST_SUFFIX.test(p) || p.length >= 3));
+    .find((p) => /[가-힣]/.test(p) && FLORIST_SUFFIX.test(p));
   if (floristParen) return floristParen;
-  // 2) 대괄호 지역태그·후미 괄호(HP/전화)·전화번호·구분자 꼬리를 제거.
-  const stripped = value
-    .replace(/^\s*\[[^\]]*\]\s*/, '')
-    .replace(/\s*[（(][^()（）]*[)）]\s*/g, ' ')
-    .replace(PHONE_PATTERN, ' ')
-    .replace(/[-–—·]+\s*$/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-  return stripped || value;
+  // 2) 대괄호 지역태그 또는 괄호(HP/전화 등)가 있을 때만 그것들을 제거해 이름을
+  //    남긴다. 대괄호·괄호 없이 '전화만' 섞인 복합값은 원본을 유지해 기존 화원명
+  //    검증기(전화 포함 시 거절)의 fail-closed 동작을 무너뜨리지 않는다.
+  const hasBracket = /^\s*\[[^\]]*\]/.test(value);
+  const hasParen = /[（(][^()（）]*[)）]/.test(value);
+  if (hasBracket || hasParen) {
+    const stripped = value
+      .replace(/^\s*\[[^\]]*\]\s*/, '')
+      .replace(/\s*[（(][^()（）]*[)）]\s*/g, ' ')
+      .replace(PHONE_PATTERN, ' ')
+      .replace(/[-–—·]+\s*$/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (stripped) return stripped;
+  }
+  return value;
 }
 
 function refineVendorSource<T extends { value: string } | undefined>(

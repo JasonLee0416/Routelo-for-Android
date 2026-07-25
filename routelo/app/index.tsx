@@ -3352,7 +3352,9 @@ function OcrScannerModal({
           </View>
           <View style={styles.scannerStep}>
             <Text style={styles.scannerStepText}>
-              {liveOcrScannerStepLabel(stage, liveSession)}
+              {stage === 'capture'
+                ? '단일샷'
+                : liveOcrScannerStepLabel(stage, liveSession)}
             </Text>
           </View>
         </View>

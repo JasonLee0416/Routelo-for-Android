@@ -317,4 +317,37 @@ describe('OCR single-image parsing quality (golden-observed)', () => {
         ?.value,
     ).toBe('KDFC한길화원');
   });
+
+  it('전각 콜론(：) 구분자도 라벨로 인정한다', () => {
+    expect(
+      field(parseReceiptText('상품명：근조화환 1개', quality), 'productName')?.value,
+    ).toBe('근조화환 1개');
+  });
+
+  it('콜론 없는 공백 경계로는 리본/이름 같은 토큰을 지우지 않는다', () => {
+    // "리본:" 라벨만 벗기고, 값이 "이름"으로 시작해도(공백 경계) 지우지 않는다.
+    // (콜론 구분자가 있을 때만 2차 라벨로 제거)
+    expect(
+      field(parseReceiptText('리본: 이름 새겨주세요', quality), 'ribbonText')?.value,
+    ).toBe('이름 새겨주세요');
+  });
+
+  it('화원 괄호 없이 전화만 섞인 복합값은 fail-closed로 거절한다', () => {
+    // 전화 포함 복합값은 화원명 검증기가 거절해야 한다(정제가 전화만 벗겨
+    // 통과시키면 안 됨). 괄호로 화원명이 분리되지 않으므로 원본 유지→거절.
+    const result = parseReceiptText(
+      '발주화원: 경기 의정부시 임플라워 010-5898-9543',
+      quality,
+    );
+    expect(field(result, 'orderingVendorName')?.value).toBe('');
+  });
+
+  it('화원명이 아닌 괄호(대표/담당)는 화원명으로 뽑지 않는다', () => {
+    expect(
+      field(
+        parseReceiptText('발주화원: 행복플라워(대표 김철수)', quality),
+        'orderingVendorName',
+      )?.value,
+    ).toBe('행복플라워');
+  });
 });
