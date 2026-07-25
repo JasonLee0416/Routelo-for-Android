@@ -43,14 +43,23 @@ function nearestAxisAngle(degrees: number) {
   return Math.min(normalized, 90 - normalized);
 }
 
-function scoreBrightness(mean: number, darkRatio: number, blownRatio: number) {
-  const ideal = 0.66;
-  return percent(
-    100 -
-      Math.abs(mean - ideal) * 115 -
-      darkRatio * 65 -
-      blownRatio * 45,
-  );
+export const BRIGHTNESS_IDEAL = 0.66;
+
+// 문서는 흰 배경 비중이 커서 평균 밝기(mean)가 이상값보다 높은 게 정상이며,
+// 이는 과노출이 아니다. 어두운 쪽(mean < ideal)은 글자 대비를 직접 떨어뜨려
+// 인식을 해치므로 강하게, 밝은 쪽은 약하게 감점한다. 완전 흰 픽셀(blownRatio)도
+// 흰 배경 문서에선 자연스러우므로 관대하게 둔다. (스캔/캡처 문서가 밝기 게이트에
+// 잘못 막혀 갤러리 OCR이 시작조차 안 되던 문제 — #122)
+export function scoreBrightness(
+  mean: number,
+  darkRatio: number,
+  blownRatio: number,
+) {
+  const deviation =
+    mean < BRIGHTNESS_IDEAL
+      ? (BRIGHTNESS_IDEAL - mean) * 150
+      : (mean - BRIGHTNESS_IDEAL) * 55;
+  return percent(100 - deviation - darkRatio * 65 - blownRatio * 20);
 }
 
 function scoreSharpness(laplacianVariance: number) {
@@ -261,10 +270,11 @@ export async function inspectReceiptImageQuality(
         : variance,
     );
 
+    const blownRatio = blownPixels / Math.max(1, pixels);
     const brightness = scoreBrightness(
       mean,
       darkPixels / Math.max(1, pixels),
-      blownPixels / Math.max(1, pixels),
+      blownRatio,
     );
     const blur = scoreSharpness(laplacianVariance);
     const documentCoverage = scoreCoverage(boxRatio, paperRatio);
@@ -289,8 +299,14 @@ export async function inspectReceiptImageQuality(
     if (blur < 55) {
       messages.push('실측 선명도가 낮습니다. 흔들림을 줄이고 초점을 다시 맞춰주세요.');
     }
+    // 밝은 쪽은 감점이 완만해 brightness<55는 사실상 저조도에서만 발생한다.
     if (brightness < 55) {
-      messages.push('실측 밝기가 좋지 않습니다. 그림자를 피하고 더 밝은 곳에서 촬영하세요.');
+      messages.push('실측 밝기가 낮습니다. 그림자를 피하고 더 밝은 곳에서 촬영하세요.');
+    }
+    // 과노출/반사는 밝기 점수와 별개로, 완전 흰 픽셀 비율로 감지해 안내한다.
+    // 정상 흰 배경 문서(blown ~0.35~0.5)는 통과, 글자가 날아갈 수준(0.6+)만 경고.
+    if (blownRatio > 0.6) {
+      messages.push('화면 반사·과노출로 글자가 날아갈 수 있습니다. 조명 반사를 줄이거나 각도를 바꿔 촬영하세요.');
     }
     if (documentCoverage < 58) {
       messages.push('인수증 종이 영역이 충분히 크게 잡히지 않았습니다. 화면을 더 꽉 채워주세요.');
