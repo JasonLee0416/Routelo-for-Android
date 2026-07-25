@@ -1,5 +1,6 @@
 import { NativeModules, Platform } from 'react-native';
 
+import { resolvePrimaryEngine } from '../config/ocrRuntimeConfig';
 import type { OcrEngineDiagnostics } from '../models';
 
 export const ANDROID_KOREAN_TEXT_MODEL_VERSION = [
@@ -41,12 +42,12 @@ const runtimeEnv = () =>
 export function androidKoreanTextRecognizerEnabled(
   env: RouteloEnv | undefined = runtimeEnv(),
 ) {
-  // 기본 주 엔진은 온디바이스 한국어 텍스트 인식(실기기 확증: 같은 인수증에서
-  // PP-OCR는 no-text/0필드, 이 엔진은 6필드 —
-  // docs/ocr-benchmark/2026-07-25-device-engine-verification.md).
-  // PP-OCR을 주 엔진으로 강제(EXPO_PUBLIC_ROUTELO_OCR_ENGINE=ppocrv5)할 때만 끈다.
-  // ocrRuntimeConfig.primaryEngine과 동일 기준(env=ppocrv5 → ppocrv5, 그 외 → korean).
-  return env?.EXPO_PUBLIC_ROUTELO_OCR_ENGINE !== 'ppocrv5';
+  // config와 동일한 단일 헬퍼로 결정한다(drift 방지). 기본은 온디바이스 한국어
+  // 엔진, PP-OCR 강제(EXPO_PUBLIC_ROUTELO_OCR_ENGINE=ppocrv5)일 때만 끈다.
+  return (
+    resolvePrimaryEngine(env?.EXPO_PUBLIC_ROUTELO_OCR_ENGINE) ===
+    'android-korean-text'
+  );
 }
 
 function nativeModule(): NativeAndroidKoreanTextRecognizer | undefined {
