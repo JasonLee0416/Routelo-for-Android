@@ -1,5 +1,6 @@
 import { NativeModules, Platform } from 'react-native';
 
+import { OCR_RUNTIME_CONFIG } from '../config/ocrRuntimeConfig';
 import type { OcrEngineDiagnostics } from '../models';
 
 export const ANDROID_KOREAN_TEXT_MODEL_VERSION = [
@@ -41,7 +42,10 @@ const runtimeEnv = () =>
 export function androidKoreanTextRecognizerEnabled(
   env: RouteloEnv | undefined = runtimeEnv(),
 ) {
-  return env?.EXPO_PUBLIC_ROUTELO_OCR_ENGINE === 'android-korean-text';
+  return (
+    env?.EXPO_PUBLIC_ROUTELO_OCR_ENGINE === 'android-korean-text' ||
+    OCR_RUNTIME_CONFIG.primaryEngine === 'android-korean-text'
+  );
 }
 
 function nativeModule(): NativeAndroidKoreanTextRecognizer | undefined {

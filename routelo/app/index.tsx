@@ -42,6 +42,10 @@ import {
 import { AccountState, EnergyType } from './account';
 import { accountRepository } from './account/native';
 import {
+  OCR_RUNTIME_CONFIG,
+  ocrRuntimeConfigSummary,
+} from './config/ocrRuntimeConfig';
+import {
   DeliveryOrder,
   evaluateCalendarRisks,
   legacyDeliveryToOrder,
@@ -2704,6 +2708,157 @@ function QualityMeter({
   );
 }
 
+type OcrFileEvidence = {
+  uri?: string;
+  width?: number;
+  height?: number;
+  fileSize?: number;
+  md5?: string;
+  exists?: boolean;
+  error?: string;
+};
+
+type OcrInputEvidence = {
+  original: OcrFileEvidence;
+  prepared: OcrFileEvidence;
+  activeInput: 'prepared' | 'original' | 'missing';
+  normalized: boolean;
+};
+
+const shortHash = (value?: string) => (value ? value.slice(0, 10) : '-');
+
+const shortUri = (value?: string) => {
+  if (!value) return '-';
+  const compact = value.replace(/^file:\/\//, '');
+  return compact.length > 42 ? `...${compact.slice(-42)}` : compact;
+};
+
+async function fileEvidence(input: {
+  uri?: string;
+  width?: number;
+  height?: number;
+  fileSize?: number;
+}): Promise<OcrFileEvidence> {
+  if (!input.uri) return { ...input, exists: false, error: 'missing-uri' };
+  try {
+    const info = (await FileSystem.getInfoAsync(input.uri, {
+      md5: true,
+    } as { md5: boolean })) as FileSystem.FileInfo & {
+      md5?: string;
+      size?: number;
+    };
+    return {
+      uri: input.uri,
+      width: input.width,
+      height: input.height,
+      fileSize:
+        info.exists && typeof info.size === 'number'
+          ? info.size
+          : input.fileSize,
+      md5: info.exists ? info.md5 : undefined,
+      exists: info.exists,
+    };
+  } catch (error) {
+    return {
+      ...input,
+      exists: false,
+      error: error instanceof Error ? error.message : 'file-info-failed',
+    };
+  }
+}
+
+async function buildOcrInputEvidence(
+  original: {
+    uri?: string;
+    width?: number;
+    height?: number;
+    fileSize?: number;
+  },
+  prepared: {
+    uri?: string;
+    width?: number;
+    height?: number;
+    fileSize?: number;
+  },
+): Promise<OcrInputEvidence> {
+  const [originalEvidence, preparedEvidence] = await Promise.all([
+    fileEvidence(original),
+    fileEvidence(prepared),
+  ]);
+  const preparedUsable = Boolean(preparedEvidence.uri && preparedEvidence.exists);
+  const originalUsable = Boolean(originalEvidence.uri && originalEvidence.exists);
+  return {
+    original: originalEvidence,
+    prepared: preparedEvidence,
+    activeInput: preparedUsable ? 'prepared' : originalUsable ? 'original' : 'missing',
+    normalized: Boolean(
+      preparedEvidence.uri &&
+        originalEvidence.uri &&
+        preparedEvidence.uri !== originalEvidence.uri,
+    ),
+  };
+}
+
+function OcrRuntimeInputCard({
+  evidence,
+}: {
+  evidence?: OcrInputEvidence;
+}) {
+  const { C, styles } = useTheme();
+  const active = evidence?.activeInput ?? 'missing';
+  const statusColor =
+    active === 'prepared' || active === 'original' ? C.success : C.warning;
+  return (
+    <View style={styles.ocrRuntimeCard}>
+      <View style={styles.ocrRuntimeHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.ocrRuntimeTitle}>OCR runtime / input evidence</Text>
+          <Text style={styles.ocrRuntimeText}>{ocrRuntimeConfigSummary()}</Text>
+        </View>
+        <View style={[styles.ocrRuntimeBadge, { backgroundColor: OCR_RUNTIME_CONFIG.diagnostics ? C.primaryContainer : C.surfaceAlt }]}>
+          <Text style={[styles.ocrRuntimeBadgeText, { color: OCR_RUNTIME_CONFIG.diagnostics ? C.onPrimaryContainer : C.textMuted }]}>
+            {OCR_RUNTIME_CONFIG.diagnostics ? 'DIAG ON' : 'DIAG OFF'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.ocrRuntimeGrid}>
+        <View style={styles.ocrRuntimeCell}>
+          <Text style={styles.ocrRuntimeLabel}>active input</Text>
+          <Text style={[styles.ocrRuntimeValue, { color: statusColor }]}>
+            {active}
+          </Text>
+        </View>
+        <View style={styles.ocrRuntimeCell}>
+          <Text style={styles.ocrRuntimeLabel}>prepared</Text>
+          <Text style={styles.ocrRuntimeValue}>
+            {evidence?.prepared.width ?? '-'}x{evidence?.prepared.height ?? '-'}
+          </Text>
+        </View>
+        <View style={styles.ocrRuntimeCell}>
+          <Text style={styles.ocrRuntimeLabel}>original</Text>
+          <Text style={styles.ocrRuntimeValue}>
+            {evidence?.original.width ?? '-'}x{evidence?.original.height ?? '-'}
+          </Text>
+        </View>
+        <View style={styles.ocrRuntimeCell}>
+          <Text style={styles.ocrRuntimeLabel}>prepared md5</Text>
+          <Text style={styles.ocrRuntimeValue}>
+            {shortHash(evidence?.prepared.md5)}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.ocrRuntimeText}>
+        preparedUri={shortUri(evidence?.prepared.uri)}
+      </Text>
+      {evidence?.prepared.error || evidence?.original.error ? (
+        <Text style={styles.ocrRuntimeError}>
+          preparedError={evidence?.prepared.error ?? '-'} · originalError={evidence?.original.error ?? '-'}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function OcrDiagnosticComparisonCard({
   report,
 }: {
@@ -2956,6 +3111,7 @@ function OcrScannerModal({
   const [imageUri, setImageUri] = useState<string>();
   const [ocrImageUri, setOcrImageUri] = useState<string>();
   const [assetInfo, setAssetInfo] = useState<{ width?: number; height?: number; fileSize?: number }>({});
+  const [ocrInputEvidence, setOcrInputEvidence] = useState<OcrInputEvidence>();
   const [result, setResult] = useState<OcrPipelineResult>();
   const [aggregateResult, setAggregateResult] = useState<OcrPipelineResult>();
   const [diagnosticReport, setDiagnosticReport] =
@@ -2975,6 +3131,7 @@ function OcrScannerModal({
     setImageUri(undefined);
     setOcrImageUri(undefined);
     setAssetInfo({});
+    setOcrInputEvidence(undefined);
     setResult(undefined);
     setAggregateResult(undefined);
     setDiagnosticReport(undefined);
@@ -3022,6 +3179,12 @@ function OcrScannerModal({
         });
     if (picked.canceled) return;
     const asset = picked.assets[0];
+    const originalInfo = {
+      uri: asset.uri,
+      width: asset.width,
+      height: asset.height,
+      fileSize: asset.fileSize,
+    };
     const prepared = await prepareReceiptImageForOcr({
       uri: asset.uri,
       width: asset.width,
@@ -3036,6 +3199,11 @@ function OcrScannerModal({
     setImageUri(asset.uri);
     setOcrImageUri(prepared.uri);
     setAssetInfo(info);
+    setOcrInputEvidence(await buildOcrInputEvidence(originalInfo, {
+      ...info,
+      uri: prepared.uri,
+    }));
+    setDiagnosticReport(undefined);
     setOcrErrorMessage(undefined);
     const preparedQuality = await inspectReceiptImageQuality({
       ...info,
@@ -3276,6 +3444,7 @@ function OcrScannerModal({
               </View>
             </View>
             <LiveScanChecklist session={liveSession} />
+            <OcrRuntimeInputCard evidence={ocrInputEvidence} />
             {ocrErrorMessage ? (
               <View style={styles.ocrDiagnosticCard}>
                 <Ionicons name="bug-outline" size={19} color={C.warning} />
@@ -3285,6 +3454,7 @@ function OcrScannerModal({
                 </View>
               </View>
             ) : null}
+            <OcrDiagnosticComparisonCard report={diagnosticReport} />
             {visionCameraPreviewProbeEnabled() ? (
               <VisionCameraPreviewProbe isActive={visible && stage === 'capture'} />
             ) : null}
@@ -3334,6 +3504,7 @@ function OcrScannerModal({
                 <Text style={styles.qualityScoreLabel}>품질</Text>
               </View>
             </View>
+            <OcrRuntimeInputCard evidence={ocrInputEvidence} />
             <View style={styles.qualityCard}>
               <View style={styles.qualityCardHeader}>
                 <View>
@@ -3458,6 +3629,7 @@ function OcrScannerModal({
                   ) : null}
                 </View>
               </View>
+              <OcrRuntimeInputCard evidence={ocrInputEvidence} />
               {result.cloudFallback?.trigger && (
                 <View style={styles.reviewGuide}>
                   <Ionicons name="cloud-upload-outline" size={19} color={C.warning} />
@@ -5207,6 +5379,64 @@ const makeStyles = (C: Palette) =>
     gap: 8,
   },
   qualityWarningText: { flex: 1, color: C.warning, fontSize: 10, fontWeight: '700' },
+  ocrRuntimeCard: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.outline,
+    backgroundColor: C.surface,
+    gap: 10,
+  },
+  ocrRuntimeHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  ocrRuntimeTitle: { color: C.text, fontSize: 12, fontWeight: '900' },
+  ocrRuntimeText: {
+    color: C.textMuted,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  ocrRuntimeBadge: {
+    minHeight: 28,
+    borderRadius: 14,
+    paddingHorizontal: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ocrRuntimeBadgeText: { fontSize: 9, fontWeight: '900' },
+  ocrRuntimeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  ocrRuntimeCell: {
+    minWidth: '47%',
+    flex: 1,
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: C.background,
+    borderWidth: 1,
+    borderColor: C.outline,
+  },
+  ocrRuntimeLabel: {
+    color: C.textMuted,
+    fontSize: 8,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  ocrRuntimeValue: { color: C.text, fontSize: 10, fontWeight: '900' },
+  ocrRuntimeError: {
+    color: C.warning,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
   ocrDiagnosticCard: {
     marginTop: 12,
     padding: 13,

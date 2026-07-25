@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 
+import { OCR_RUNTIME_CONFIG } from '../config/ocrRuntimeConfig';
 import type {
   CaptureQuality,
   OcrFieldKey,
@@ -104,6 +105,7 @@ export function ocrDiagnosticComparisonEnabled(
   env: RouteloEnv | undefined = runtimeEnv(),
 ) {
   return (
+    OCR_RUNTIME_CONFIG.diagnostics ||
     env?.EXPO_PUBLIC_ROUTELO_OCR_DIAGNOSTICS === '1' ||
     env?.EXPO_PUBLIC_ROUTELO_OCR_PROFILE === 'ocr-recovery-test'
   );
