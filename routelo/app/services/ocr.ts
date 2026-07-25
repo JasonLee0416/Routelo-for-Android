@@ -232,24 +232,137 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// 별칭을 "라벨" 로 인정하려면 뒤에 구분자(콜론/슬래시/공백/줄끝)가 와야 한다.
+// 이 경계가 없으면 '상품'이 '상품코드'를, '인수자'가 '인수자명'을 잘못 흡수한다.
+// 별칭 내부 공백은 OCR 변형을 흡수하도록 \s* 로 유연화한다.
+function labelPattern(alias: string) {
+  const core = alias.trim().split(/\s+/).map(escapeRegExp).join('\\s*');
+  return new RegExp(`^\\s*${core}\\s*(?:[:：|/]\\s*|\\s+|$)`, 'i');
+}
+
+// 값 앞에 다시 붙은 2차 라벨을 걷어낸다. 실제 인수증은 "배달장소: 주소 서울…",
+// "인수자: 받는분 고 박희순", "리본: 경조사어: 삼가…" 처럼 라벨을 중첩 표기한다.
+// ANY: 공백만으로도 제거해도 안전한 라벨(실제 값이 이 토큰으로 시작할 일이 거의 없음).
+const SECONDARY_LABELS_ANY = [
+  '주소',
+  '받는분',
+  '받는 분',
+  '받으실분',
+  '받으실 분',
+  '경조사어',
+];
+// COLON: 실제 값이 이 토큰으로 시작할 수 있어(예: 화원명 "리본 플라워", 이름) 콜론
+// 구분자가 명시된 경우에만 제거한다.
+const SECONDARY_LABELS_COLON = ['리본문구', '리본', '성명', '이름'];
+
+function labelPatternColon(alias: string) {
+  const core = alias.trim().split(/\s+/).map(escapeRegExp).join('\\s*');
+  return new RegExp(`^\\s*${core}\\s*[:：|/]\\s*`, 'i');
+}
+
+function stripRedundantLabels(value: string) {
+  let current = value.trim();
+  for (let guard = 0; guard < 10; guard += 1) {
+    let stripped = false;
+    for (const label of SECONDARY_LABELS_ANY) {
+      const match = current.match(labelPattern(label));
+      if (match && match[0].length < current.length) {
+        current = current.slice(match[0].length).trim();
+        stripped = true;
+        break;
+      }
+    }
+    if (!stripped) {
+      for (const label of SECONDARY_LABELS_COLON) {
+        const match = current.match(labelPatternColon(label));
+        if (match && match[0].length < current.length) {
+          current = current.slice(match[0].length).trim();
+          stripped = true;
+          break;
+        }
+      }
+    }
+    if (!stripped) break;
+  }
+  return current;
+}
+
+// [불명](unknownToken)만 남는 값은 사실상 빈 값이다 — 그대로 채우면 "명: [불명]"
+// 같은 쓰레기가 필드에 들어간다. 불명 토큰을 제거해 알맹이가 없으면 빈 문자열.
+function voidIfUnknown(value: string) {
+  const withoutUnknown = value.replace(/\[?\s*불명\s*\]?/g, '');
+  const residue = withoutUnknown.replace(/[·・.,/\-\s]+/g, '').trim();
+  if (!residue) return '';
+  // 불명 토큰 제거 후 남는 고아 구분자/중복 공백을 정리한다("070-[불명]"→"070").
+  return withoutUnknown
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s·・.,/\-]+|[\s·・.,/\-]+$/g, '')
+    .trim();
+}
+
+function cleanFieldValue(value: string) {
+  return voidIfUnknown(stripRedundantLabels(value));
+}
+
+// 실제 인수증의 발주/배송 화원은 전화·지역이 뒤섞인 복합 표기가 흔하다:
+//  · KDFC 대시형: "경기 의정부시-경기의정21호(임플라워)-010-5898-9543"
+//  · 네이버 대괄호형: "[서울 마포구] 가든스로즈블리 (HP:010-4482-9119)"
+// 이런 값은 화원명 검증기(전화 포함 시 거절)에 걸려 통째로 버려진다. 화원명만
+// 보수적으로 뽑아낸다(추출 실패 시 원본 유지 → 기존 검증기가 판단). 값은 review.
+const FLORIST_SUFFIX = /(?:화원|플라워|농원|꽃집|꽃|원예|원|센터|flower)$/i;
+
+// 담당자·지점 등 화원명이 아닌 괄호 내용은 제외한다(예: "행복플라워(대표 김철수)"
+// 에서 대표명을 화원명으로 잘못 뽑지 않도록).
+const NON_FLORIST_PAREN = /HP|TEL|FAX|전화|팩스|연락|대표|담당|직통|사장|실장|점장/i;
+
+function refineVendorCandidate(raw: string): string {
+  const value = raw.trim();
+  if (!value) return value;
+  // 1) 괄호 안 화원명 우선(마지막 괄호부터). 화원 접미사가 있는 것만 채택 —
+  //    접미사가 없으면 지점/담당명일 수 있어 잘못 뽑는다.
+  const parens = [...value.matchAll(/[（(]\s*([^()（）]+?)\s*[)）]/g)].map((m) =>
+    m[1].trim(),
+  );
+  const floristParen = parens
+    .filter((p) => !/\d/.test(p) && !NON_FLORIST_PAREN.test(p))
+    .reverse()
+    .find((p) => /[가-힣]/.test(p) && FLORIST_SUFFIX.test(p));
+  if (floristParen) return floristParen;
+  // 2) 대괄호 지역태그 또는 괄호(HP/전화 등)가 있을 때만 그것들을 제거해 이름을
+  //    남긴다. 대괄호·괄호 없이 '전화만' 섞인 복합값은 원본을 유지해 기존 화원명
+  //    검증기(전화 포함 시 거절)의 fail-closed 동작을 무너뜨리지 않는다.
+  const hasBracket = /^\s*\[[^\]]*\]/.test(value);
+  const hasParen = /[（(][^()（）]*[)）]/.test(value);
+  if (hasBracket || hasParen) {
+    const stripped = value
+      .replace(/^\s*\[[^\]]*\]\s*/, '')
+      .replace(/\s*[（(][^()（）]*[)）]\s*/g, ' ')
+      .replace(PHONE_PATTERN, ' ')
+      .replace(/[-–—·]+\s*$/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (stripped) return stripped;
+  }
+  return value;
+}
+
+function refineVendorSource<T extends { value: string } | undefined>(
+  source: T,
+): T {
+  if (!source) return source;
+  return { ...source, value: refineVendorCandidate(source.value) };
+}
+
 function findLabeledValue(lines: string[], aliases: string[]) {
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
+    const line = lines[index].trim();
     for (const alias of [...aliases].sort(
       (left, right) => right.length - left.length,
     )) {
-      if (!compactLabel(line).startsWith(compactLabel(alias))) continue;
-      const value = line
-        .replace(
-          new RegExp(`^\\s*${escapeRegExp(alias)}\\s*[:：|]?\\s*`, 'i'),
-          '',
-        )
-        .trim();
-      if (
-        !value ||
-        value === line.trim() ||
-        compactLabel(value) === compactLabel(alias)
-      ) {
+      const match = line.match(labelPattern(alias));
+      if (!match) continue;
+      const value = cleanFieldValue(line.slice(match[0].length).trim());
+      if (!value || compactLabel(value) === compactLabel(alias)) {
         continue;
       }
       return {
@@ -268,8 +381,9 @@ function firstMatchingLine(
 ) {
   const index = lines.findIndex(predicate);
   if (index < 0) return undefined;
+  const cleaned = cleanFieldValue(lines[index].trim());
   return {
-    value: lines[index],
+    value: cleaned || lines[index].trim(),
     sourceText: lines[index],
     sourceLineIds: [lineId(index)],
   };
@@ -446,7 +560,8 @@ export function parseReceiptText(
   // 놓친 '빈 필드만' mapped 값으로 채운다(하드코딩 우선, 레지스트리는 보강).
   // 복구값은 여전히 forceReview→status 'review'로 표시되므로 zero-fabrication 유지.
   const registrySource = (key: keyof typeof mapped) => {
-    const value = mapped[key]?.trim();
+    // 레지스트리 값에도 2차 라벨/불명 토큰 정리를 동일 적용한다.
+    const value = cleanFieldValue((mapped[key] || '').trim());
     // sourceLineIds는 findLabeledValue와 형태를 맞추기 위해 빈 배열로 둔다
     // (레지스트리 매핑은 특정 원본 줄 인덱스를 보존하지 않는다).
     return value
@@ -454,12 +569,14 @@ export function parseReceiptText(
       : undefined;
   };
 
-  const orderingVendor =
+  const orderingVendor = refineVendorSource(
     findLabeledValue(lines, ['발주화원', '발주처', '발주회원']) ||
-    registrySource('orderingVendorName');
-  const fulfillingVendor =
+      registrySource('orderingVendorName'),
+  );
+  const fulfillingVendor = refineVendorSource(
     findLabeledValue(lines, ['배송화원', '수주화원', '수주회원']) ||
-    registrySource('fulfillingVendorName');
+      registrySource('fulfillingVendorName'),
+  );
   // 명시 라벨로 잡힌 전화만 확정(confirmed) 대상이고, 레지스트리 퍼지 폴백으로
   // 복구된 전화는 검토(review)로만 둔다(zero-fabrication). `||`가 검증 전에
   // 하드코딩/레지스트리 중 하나로 확정되므로, 하드코딩 miss 여부가 곧 폴백 출처다.
@@ -501,6 +618,7 @@ export function parseReceiptText(
       '리본메세지',
       '리본메시지',
       '경조사어',
+      '리본',
     ]) ||
     firstMatchingLine(lines, (line) =>
       /삼가.*(?:명복|조의)|축하.*(?:결혼|개업)|부활/.test(line),
@@ -551,8 +669,15 @@ export function parseReceiptText(
     ) ||
     registrySource('deliveryAddress');
   const recipientSource =
-    findLabeledValue(lines, ['받는분', '받는 분', '수령인', '인수자']) ||
-    registrySource('recipientName');
+    findLabeledValue(lines, [
+      '받으실분',
+      '받으실 분',
+      '인수자명',
+      '받는분',
+      '받는 분',
+      '수령인',
+      '인수자',
+    ]) || registrySource('recipientName');
   const recipientName = safeReceiptRecipientName(recipientSource?.value || '');
   const recipientTelSource = validatedPhoneCandidate(
     findLabeledValue(lines, [

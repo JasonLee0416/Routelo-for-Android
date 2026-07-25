@@ -140,15 +140,10 @@ import {
 } from './services/ocrDiagnostics';
 import {
   createInitialLiveOcrSession,
-  liveOcrChecklistItems,
-  liveOcrIncompleteMessage,
   liveOcrReviewQuery,
   liveOcrScannerStepLabel,
   LiveOcrScanStage,
-  summarizeLiveOcrSession,
   liveOcrStageTitle,
-  mergeOcrResult,
-  updateLiveOcrSession,
 } from './services/liveOcr';
 import {
   VisionCameraPreviewProbe,
@@ -2955,61 +2950,6 @@ function OcrDiagnosticComparisonCard({
   );
 }
 
-function LiveScanChecklist({
-  session,
-}: {
-  session: ReturnType<typeof createInitialLiveOcrSession>;
-}) {
-  const { C, styles } = useTheme();
-  const summary = summarizeLiveOcrSession(session);
-  const checklist = liveOcrChecklistItems(session);
-  return (
-    <View style={styles.liveChecklist}>
-      <View style={styles.liveChecklistHeader}>
-        <Text style={styles.liveChecklistTitle}>필수 인식 항목</Text>
-        <Text style={styles.liveChecklistMeta}>{summary.lockedCount}/{summary.totalCount}</Text>
-      </View>
-      {checklist.map((field) => {
-        return (
-          <View
-            key={field.id}
-            style={[
-              styles.liveChecklistItem,
-              field.locked ? styles.liveChecklistItemLocked : undefined,
-              field.candidate ? styles.liveChecklistItemCandidate : undefined,
-            ]}
-          >
-            <View
-              style={[
-                styles.liveChecklistIcon,
-                {
-                  backgroundColor: field.locked
-                    ? C.successBg
-                    : field.candidate
-                      ? C.warningBg
-                      : C.surfaceAlt,
-                },
-              ]}
-            >
-              <Ionicons
-                name={field.locked ? 'checkmark-circle' : 'close-circle-outline'}
-                size={19}
-                color={field.locked ? C.success : field.candidate ? C.warning : C.textMuted}
-              />
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.liveChecklistLabel}>{field.label}</Text>
-              <Text style={styles.liveChecklistValue} numberOfLines={1}>
-                {field.detail}
-              </Text>
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 function AddressVerificationPanel({
   result,
   onSelect,
@@ -3122,10 +3062,6 @@ function OcrScannerModal({
   const [addressVerification, setAddressVerification] =
     useState<AddressVerificationResult>();
   const [liveSession, setLiveSession] = useState(createInitialLiveOcrSession);
-  // 갤러리에서 고른 단일 이미지는 라이브 누적(다중 프레임 안정화)을 우회하고
-  // 그 한 장의 OCR 결과로 바로 검토 화면으로 간다(#124). 카메라 연속 촬영만 누적.
-  const [captureFromGallery, setCaptureFromGallery] = useState(false);
-  const liveSummary = summarizeLiveOcrSession(liveSession);
   const deliveryAddressValue =
     fields.find((item) => item.key === 'deliveryAddress')?.value || '';
 
@@ -3143,7 +3079,6 @@ function OcrScannerModal({
     setVendorCheck(undefined);
     setAddressVerification(undefined);
     setLiveSession(createInitialLiveOcrSession());
-    setCaptureFromGallery(false);
   };
 
   const setStageAnimated = (next: ScanStage) => {
@@ -3170,7 +3105,6 @@ function OcrScannerModal({
       Alert.alert('권한 필요', '인수증을 촬영하거나 불러오려면 사진 접근 권한이 필요합니다.');
       return;
     }
-    setCaptureFromGallery(!camera);
     const picked = camera
       ? await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
@@ -3297,36 +3231,18 @@ function OcrScannerModal({
           result?.quality,
         );
       }
-      if (captureFromGallery) {
-        // 갤러리 단일 이미지: 다중 프레임 안정화(임계·supportCount)를 우회하고
-        // 이 한 장의 OCR 결과를 그대로 검토 화면으로 보낸다(#124). 유저가 갤러리
-        // 인수증 1장으로 즉시 인식하는 실사용 경로다. 약한/부분 필드는 검토
-        // 화면에서 사용자가 확인·보정한다(자동 등록 아님, zero-fabrication 유지).
-        // 앞서 카메라로 누적한 aggregate가 있어도 단일샷 결과로 대체한다(의도된 시맨틱).
-        setAggregateResult(next);
-        setLiveSession(createInitialLiveOcrSession());
-        setResult(next);
-        setFields(next.fields);
-        setStageAnimated('review');
-        verifyForReview(next.fields);
-        return;
-      }
-      const merged = mergeOcrResult(aggregateResult, next);
-      const nextSession = updateLiveOcrSession(liveSession, next);
-      setAggregateResult(merged);
-      setLiveSession(nextSession);
-      setResult(merged);
-      setFields(merged.fields);
-      if (nextSession.readyForReview) {
-        setStageAnimated('review');
-        verifyForReview(merged.fields);
-      } else {
-        setStageAnimated('capture');
-        Alert.alert(
-          '프레임 누적 완료',
-          liveOcrIncompleteMessage(nextSession),
-        );
-      }
+      // 단일 이미지 즉시 인식: 다중 프레임 누적(supportCount 안정화)을 폐기하고,
+      // 카메라·갤러리 구분 없이 이 한 장의 OCR 결과로 바로 검토 화면에 진입한다.
+      // 사용자가 3~4프레임을 반복 촬영하는 불편을 없애고 단일 프레임 인식률을
+      // 최대한 끌어올리는 방향(파싱 품질 개선과 함께). 약한/부분 필드는 검토
+      // 화면에서 사용자가 확인·보정한다(자동 등록 아님, zero-fabrication 유지).
+      // 결과가 부실하면 검토 화면에서 다시 촬영/선택하면 된다.
+      setAggregateResult(next);
+      setLiveSession(createInitialLiveOcrSession());
+      setResult(next);
+      setFields(next.fields);
+      setStageAnimated('review');
+      verifyForReview(next.fields);
     } catch (error) {
       const message =
         error instanceof OcrRecognizerUnavailableError || error instanceof OcrNoTextDetectedError
@@ -3436,7 +3352,9 @@ function OcrScannerModal({
           </View>
           <View style={styles.scannerStep}>
             <Text style={styles.scannerStepText}>
-              {liveOcrScannerStepLabel(stage, liveSession)}
+              {stage === 'capture'
+                ? '단일샷'
+                : liveOcrScannerStepLabel(stage, liveSession)}
             </Text>
           </View>
         </View>
@@ -3450,19 +3368,16 @@ function OcrScannerModal({
               <View style={[styles.captureCorner, styles.captureCornerBottomRight]} />
               <View style={styles.documentPreview}>
                 <Ionicons name="document-text-outline" size={55} color={C.primary} />
-                <Text style={styles.documentPreviewTitle}>3개 필드를 찾을 때까지 스캔합니다</Text>
+                <Text style={styles.documentPreviewTitle}>인수증 한 장을 촬영하세요</Text>
                 <Text style={styles.documentPreviewCaption}>
-                  상호명, 주소, 전화번호가 안정적으로 잠기면 검토 화면으로 이동합니다.
+                  사진 한 장을 찍으면 바로 인식해 검토 화면으로 이동합니다.
                 </Text>
               </View>
               <View style={styles.autoCaptureBadge}>
                 <View style={styles.autoCaptureDot} />
-                <Text style={styles.autoCaptureText}>
-                  {liveSummary.frameSummary}
-                </Text>
+                <Text style={styles.autoCaptureText}>단일 프레임 인식</Text>
               </View>
             </View>
-            <LiveScanChecklist session={liveSession} />
             <OcrRuntimeInputCard evidence={ocrInputEvidence} />
             {ocrErrorMessage ? (
               <View style={styles.ocrDiagnosticCard}>
@@ -3493,13 +3408,11 @@ function OcrScannerModal({
             </View>
             <Pressable style={styles.scanPrimaryButton} onPress={() => selectImage(true)}>
               <Ionicons name="camera" size={21} color={C.onPrimary} />
-              <Text style={styles.scanPrimaryButtonText}>
-                {liveSummary.primaryCaptureLabel}
-              </Text>
+              <Text style={styles.scanPrimaryButtonText}>인수증 촬영</Text>
             </Pressable>
             <Pressable style={styles.scanSecondaryButton} onPress={() => selectImage(false)}>
               <Ionicons name="images-outline" size={20} color={C.primary} />
-              <Text style={styles.scanSecondaryButtonText}>갤러리 프레임 추가</Text>
+              <Text style={styles.scanSecondaryButtonText}>갤러리에서 선택</Text>
             </Pressable>
           </ScrollView>
         )}
@@ -3581,7 +3494,7 @@ function OcrScannerModal({
             <View style={styles.variantInfo}>
               <Ionicons name="layers-outline" size={20} color={C.primary} />
               <Text style={styles.variantInfoText}>
-                품질이 통과한 프레임만 OCR에 넣고, 필드별 후보를 누적합니다.
+                품질이 통과한 사진 한 장을 온디바이스 OCR로 분석해 바로 검토합니다.
               </Text>
             </View>
             <View style={styles.scanActionRow}>
@@ -3589,7 +3502,7 @@ function OcrScannerModal({
                 <Text style={styles.scanSecondaryButtonText}>스캔 초기화</Text>
               </Pressable>
               <Pressable style={styles.scanPrimaryFlex} onPress={analyze}>
-                <Text style={styles.scanPrimaryButtonText}>이 프레임 누적</Text>
+                <Text style={styles.scanPrimaryButtonText}>이 사진으로 인식</Text>
                 <Ionicons name="arrow-forward" size={18} color={C.onPrimary} />
               </Pressable>
             </View>
@@ -3605,7 +3518,7 @@ function OcrScannerModal({
             <Text style={styles.processingCaption}>
               프레임 OCR은 온디바이스로만 수행하고, 온라인 검증은 리뷰 진입 후 한 번만 실행합니다.
             </Text>
-            {['프레임 품질 gate', '로컬 PP-OCR 실행', '상호명·주소·전화번호 후보 누적', '3개 필드 lock 판정'].map(
+            {['사진 품질 gate', '온디바이스 OCR 실행', '필드 추출·라벨 정제', '검토 화면 준비'].map(
               (item, index) => (
                 <View key={item} style={styles.processingStep}>
                   <View style={[styles.processingStepIcon, index < 2 && styles.processingStepIconActive]}>
@@ -3639,7 +3552,7 @@ function OcrScannerModal({
                         : '명시적 테스트 샘플'}
                   </Text>
                   <Text style={styles.ocrSummaryMetaText}>
-                    {liveSession.acceptedFrameCount}개 프레임 누적 · {result.processingMs}ms
+                    단일 프레임 인식 · {result.processingMs}ms
                   </Text>
                   {result.ocrDiagnostics ? (
                     <Text style={styles.ocrSummaryMetaText}>
@@ -3666,7 +3579,6 @@ function OcrScannerModal({
                 </View>
               )}
               <OcrDiagnosticComparisonCard report={diagnosticReport} />
-              <LiveScanChecklist session={liveSession} />
               <View style={styles.reviewGuide}>
                 <Ionicons name="information-circle-outline" size={19} color={C.primary} />
                 <Text style={styles.reviewGuideText}>
