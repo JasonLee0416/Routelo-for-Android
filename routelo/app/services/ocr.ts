@@ -440,33 +440,60 @@ export function parseReceiptText(
     DEFAULT_FIELD_REGISTRY,
   );
 
-  const orderingVendor = findLabeledValue(lines, [
-    '발주화원',
-    '발주처',
-    '발주회원',
-  ]);
-  const fulfillingVendor = findLabeledValue(lines, [
-    '배송화원',
-    '수주화원',
-    '수주회원',
+  // 레지스트리 폴백: normalizeReceipt(mapped)는 별칭 사전 + 부분일치 + 편집거리로
+  // 라벨을 정규 필드에 매핑하는데, 지금까지 parseReceiptText가 deliveryDate 외에는
+  // 이 결과를 전부 버려 사실상 죽은 코드였다. 아래 하드코딩 findLabeledValue가
+  // 놓친 '빈 필드만' mapped 값으로 채운다(하드코딩 우선, 레지스트리는 보강).
+  // 복구값은 여전히 forceReview→status 'review'로 표시되므로 zero-fabrication 유지.
+  const registrySource = (key: keyof typeof mapped) => {
+    const value = mapped[key]?.trim();
+    // sourceLineIds는 findLabeledValue와 형태를 맞추기 위해 빈 배열로 둔다
+    // (레지스트리 매핑은 특정 원본 줄 인덱스를 보존하지 않는다).
+    return value
+      ? { value, sourceText: value, sourceLineIds: [] as string[] }
+      : undefined;
+  };
+
+  const orderingVendor =
+    findLabeledValue(lines, ['발주화원', '발주처', '발주회원']) ||
+    registrySource('orderingVendorName');
+  const fulfillingVendor =
+    findLabeledValue(lines, ['배송화원', '수주화원', '수주회원']) ||
+    registrySource('fulfillingVendorName');
+  // 명시 라벨로 잡힌 전화만 확정(confirmed) 대상이고, 레지스트리 퍼지 폴백으로
+  // 복구된 전화는 검토(review)로만 둔다(zero-fabrication). `||`가 검증 전에
+  // 하드코딩/레지스트리 중 하나로 확정되므로, 하드코딩 miss 여부가 곧 폴백 출처다.
+  const orderingVendorTelLabeled = findLabeledValue(lines, [
+    '발주화원 전화',
+    '발주처 전화',
+    '발주 전화',
   ]);
   const orderingVendorTel = validatedPhoneCandidate(
-    findLabeledValue(lines, ['발주화원 전화', '발주처 전화', '발주 전화']),
+    orderingVendorTelLabeled || registrySource('orderingVendorTel'),
   );
+  const orderingVendorTelFromRegistry = !orderingVendorTelLabeled;
+  const fulfillingVendorTelLabeled = findLabeledValue(lines, [
+    '배송화원 전화',
+    '수주화원 전화',
+    '배송 전화',
+  ]);
   const fulfillingVendorTel = validatedPhoneCandidate(
-    findLabeledValue(lines, ['배송화원 전화', '수주화원 전화', '배송 전화']),
+    fulfillingVendorTelLabeled || registrySource('fulfillingVendorTel'),
   );
+  const fulfillingVendorTelFromRegistry = !fulfillingVendorTelLabeled;
 
   const productSource =
     findLabeledValue(lines, ['상품명', '배송상품', '품명', '상품']) ||
     firstMatchingLine(lines, (line) =>
       /(?:축하|근조).*(?:화환|3단)|화환.*(?:축하|근조|3단)/.test(line),
-    );
+    ) ||
+    registrySource('productName');
   const quantitySource =
     findLabeledValue(lines, ['수량', '개수', '갯수']) ||
     (productSource && /\d+\s*(?:개|단|EA|ea)/.test(productSource.value)
       ? productSource
-      : undefined);
+      : undefined) ||
+    registrySource('productQuantity');
   const ribbonSource =
     findLabeledValue(lines, [
       '리본문구',
@@ -477,7 +504,8 @@ export function parseReceiptText(
     ]) ||
     firstMatchingLine(lines, (line) =>
       /삼가.*(?:명복|조의)|축하.*(?:결혼|개업)|부활/.test(line),
-    );
+    ) ||
+    registrySource('ribbonText');
 
   const dateSource =
     findLabeledValue(lines, ['배달일시', '배달일자', '배송일시', '배송일자']) ||
@@ -513,24 +541,18 @@ export function parseReceiptText(
     : '';
   const eventTime = eventSource ? normalizeReceiptTime(eventSource.value) : '';
 
-  const venueSource = findLabeledValue(lines, [
-    '업체명',
-    '상호명',
-    '예식장',
-    '웨딩홀',
-    '배송처',
-  ]);
+  const venueSource =
+    findLabeledValue(lines, ['업체명', '상호명', '예식장', '웨딩홀', '배송처']) ||
+    registrySource('venueName');
   const addressSource =
     findLabeledValue(lines, ['배송주소', '배달주소', '배송지', '배달장소', '주소']) ||
     firstMatchingLine(lines, (line) =>
       /(?:서울|경기)\s+[\p{Script=Hangul}\d\- ]+(?:구|시|군)\s+/u.test(line),
-    );
-  const recipientSource = findLabeledValue(lines, [
-    '받는분',
-    '받는 분',
-    '수령인',
-    '인수자',
-  ]);
+    ) ||
+    registrySource('deliveryAddress');
+  const recipientSource =
+    findLabeledValue(lines, ['받는분', '받는 분', '수령인', '인수자']) ||
+    registrySource('recipientName');
   const recipientName = safeReceiptRecipientName(recipientSource?.value || '');
   const recipientTelSource = validatedPhoneCandidate(
     findLabeledValue(lines, [
@@ -541,19 +563,20 @@ export function parseReceiptText(
       '수령자 연락처',
       '인수자 연락처',
       '핸드폰',
-    ]),
+    ]) || registrySource('recipientTel'),
   );
   const phoneAlternatives = allMatches(text, PHONE_PATTERN)
     .map(normalizePhone)
     .filter((phone) => VALID_PHONE.test(phone));
-  const memoSource = findLabeledValue(lines, [
-    '요청사항',
-    '요구사항',
-    '특이사항',
-    '메모',
-    '주의',
-    '비고',
-  ]);
+  const memoSource =
+    findLabeledValue(lines, [
+      '요청사항',
+      '요구사항',
+      '특이사항',
+      '메모',
+      '주의',
+      '비고',
+    ]) || registrySource('memo');
   const memo =
     memoSource && !allMatches(memoSource.value, PHONE_PATTERN).length
       ? memoSource.value
@@ -581,6 +604,7 @@ export function parseReceiptText(
       {
         sourceLineIds: orderingVendorTel?.sourceLineIds,
         extractionMethod: orderingVendorTel ? 'label' : undefined,
+        forceReview: orderingVendorTelFromRegistry,
       },
     ),
     field(
@@ -604,6 +628,7 @@ export function parseReceiptText(
       {
         sourceLineIds: fulfillingVendorTel?.sourceLineIds,
         extractionMethod: fulfillingVendorTel ? 'label' : undefined,
+        forceReview: fulfillingVendorTelFromRegistry,
       },
     ),
     field(

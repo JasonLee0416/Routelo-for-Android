@@ -179,3 +179,69 @@ describe('OCR zero-fabrication guard', () => {
     ).toBe('010-4821-7732');
   });
 });
+
+// 실기기 ML Kit가 반환한 한국직거래화훼센터 인수증 원문에서, 라벨이 부분 인식된
+// 줄(예: "발주처"가 "주처"로 잘림)을 하드코딩 lookup은 놓쳤다. 레지스트리
+// 별칭 사전('주처')은 이를 잡는데 그 결과(mapped)가 그동안 버려져 필드가 비었다.
+// 아래 테스트는 registrySource 폴백이 그 공백을 메우되 status는 'review'로만 두어
+// zero-fabrication을 지키는지 고정한다.
+describe('OCR registry alias fallback (dead-code activation)', () => {
+  const field = (result: ReturnType<typeof parseReceiptText>, key: string) =>
+    result.fields.find((item) => item.key === key);
+
+  it('recovers 발주화원 from the partial "주처" label the hardcoded lookup missed', () => {
+    const text = [
+      '한국직거래화훼센터 인수증',
+      '본부전화:1566-0028',
+      '주처 아뜰리에몽플라워',
+      '상품명 축하3단',
+      '배송주소 서울 영등포구 국제금융로 10',
+    ].join('\n');
+
+    const result = parseReceiptText(text, quality);
+    const ordering = field(result, 'orderingVendorName');
+
+    expect(ordering?.value).toBe('아뜰리에몽플라워');
+    // 복구값은 검토 대상이지 확정이 아니다(zero-fabrication).
+    expect(ordering?.status).toBe('review');
+  });
+
+  it('does not overwrite a hardcoded hit with the registry value', () => {
+    // 레지스트리만 잡는 라벨("주처")을 먼저 두어, 두 경로가 서로 다른 값을
+    // 내도록 한다. 하드코딩 우선이 아니면 '아뜰리에몽플라워'가 나올 것이다.
+    const text = [
+      '주처 아뜰리에몽플라워',
+      '발주화원 마음꽃화원',
+    ].join('\n');
+
+    // 하드코딩 findLabeledValue가 잡은 "마음꽃화원"이 우선한다.
+    expect(field(parseReceiptText(text, quality), 'orderingVendorName')?.value).toBe(
+      '마음꽃화원',
+    );
+  });
+
+  it('keeps a registry-recovered vendor phone in review, never confirmed', () => {
+    // "발주처 연락처"는 하드코딩 lookup(발주화원/발주처/발주 전화)엔 없고
+    // 레지스트리 별칭에만 있다. 폴백으로 복구되더라도 퍼지 매칭이므로 확정하면
+    // 안 되고 검토(review)여야 한다(zero-fabrication).
+    const result = parseReceiptText('발주처 연락처 02-1234-5678', quality);
+    const tel = field(result, 'orderingVendorTel');
+    expect(tel?.value).toBe('02-1234-5678');
+    expect(tel?.status).toBe('review');
+  });
+
+  it('still confirms an explicitly-labeled vendor phone', () => {
+    // 명시 라벨("발주화원 전화")로 잡힌 전화는 기존대로 확정(confirmed) 유지.
+    const result = parseReceiptText('발주화원 전화 02-1234-5678', quality);
+    const tel = field(result, 'orderingVendorTel');
+    expect(tel?.value).toBe('02-1234-5678');
+    expect(tel?.status).toBe('confirmed');
+  });
+
+  it('leaves fields missing when neither path matches (no fabrication)', () => {
+    const result = parseReceiptText('본부전화:1566-0028\n인수증', quality);
+    const ordering = field(result, 'orderingVendorName');
+    expect(ordering?.value).toBe('');
+    expect(ordering?.status).toBe('missing');
+  });
+});
