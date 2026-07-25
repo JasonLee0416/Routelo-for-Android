@@ -1,0 +1,1981 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-25T06:22:21.828Z",
+  "purpose": "Sweep axis-aligned field-distance OCR heuristics over recorded Android Korean ML Kit line boxes.",
+  "source": {
+    "dataset": "routelo-receipt-samples-2026-06-21",
+    "nativeBaseline": "routelo/docs/ocr-benchmark/2026-06-23/native-results.json",
+    "samples": 8,
+    "engine": "com.google.mlkit:text-recognition-korean:16.0.1"
+  },
+  "constantsSearched": 243,
+  "baselineAggregate": {
+    "requiredPopulated": 13,
+    "allPopulated": 21,
+    "goldenLooseHits": 12,
+    "documentConfidence": 45.75
+  },
+  "bestAggregate": {
+    "requiredPopulated": 24,
+    "allPopulated": 50,
+    "goldenLooseHits": 29,
+    "documentConfidence": 83.25,
+    "score": 5258
+  },
+  "bestConfig": {
+    "sameRowYRatio": 0.018,
+    "xLeftSlackRatio": 0.015,
+    "xRightGrowRatio": 0.55,
+    "yUpSlackRatio": 0.12,
+    "yDownGrowRatio": 0.07,
+    "maxCandidatesPerAnchor": 3
+  },
+  "deltas": {
+    "requiredPopulated": 11,
+    "allPopulated": 29,
+    "goldenLooseHits": 17,
+    "documentConfidence": 37.5
+  },
+  "baselineBySample": [
+    {
+      "file": "KakaoTalk_20260621_070828835.jpg",
+      "summary": {
+        "documentConfidence": 27,
+        "requiredPopulated": 1,
+        "allPopulated": 3,
+        "missingRequired": [
+          "deliveryDate",
+          "deliveryAddress"
+        ],
+        "goldenLooseHits": 2,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "축하 - 축하3단",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-15"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "3",
+            "status": "review",
+            "confidence": 78,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-15"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientName": {
+            "value": "신부 선 단비",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-19"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      }
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_01.jpg",
+      "summary": {
+        "documentConfidence": 27,
+        "requiredPopulated": 1,
+        "allPopulated": 2,
+        "missingRequired": [
+          "deliveryDate",
+          "deliveryAddress"
+        ],
+        "goldenLooseHits": 0,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "명",
+            "status": "warning",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-4"
+            ],
+            "goldenLooseHit": false
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "eventTime": {
+            "value": "11:00",
+            "status": "review",
+            "confidence": 86,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-22"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      }
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_02.jpg",
+      "summary": {
+        "documentConfidence": 86,
+        "requiredPopulated": 3,
+        "allPopulated": 4,
+        "missingRequired": [],
+        "goldenLooseHits": 3,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "명",
+            "status": "warning",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-4"
+            ],
+            "goldenLooseHit": false
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-27"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "review",
+            "confidence": 92,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-21"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "서울 동작구 중앙대병원 장례식장 5호",
+            "status": "review",
+            "confidence": 84,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-14"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "고 박희순",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-15"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      }
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_03.jpg",
+      "summary": {
+        "documentConfidence": 86,
+        "requiredPopulated": 3,
+        "allPopulated": 4,
+        "missingRequired": [],
+        "goldenLooseHits": 3,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "명",
+            "status": "warning",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-4"
+            ],
+            "goldenLooseHit": false
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-27"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "review",
+            "confidence": 92,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-23"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "서울 영등포구 선유로 101 교원예욱 서서울 장례식장 201호",
+            "status": "review",
+            "confidence": 84,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-25"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "고인 심명철",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-15"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      }
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_04.jpg",
+      "summary": {
+        "documentConfidence": 58,
+        "requiredPopulated": 2,
+        "allPopulated": 3,
+        "missingRequired": [
+          "deliveryAddress"
+        ],
+        "goldenLooseHits": 1,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "코드",
+            "status": "warning",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-5"
+            ],
+            "goldenLooseHit": false
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "review",
+            "confidence": 92,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-34"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientName": {
+            "value": "명",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-22"
+            ],
+            "goldenLooseHit": false
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      }
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_05.jpg",
+      "summary": {
+        "documentConfidence": 0,
+        "requiredPopulated": 0,
+        "allPopulated": 0,
+        "missingRequired": [
+          "deliveryDate",
+          "productName",
+          "deliveryAddress"
+        ],
+        "goldenLooseHits": 0,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      }
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_06.jpg",
+      "summary": {
+        "documentConfidence": 27,
+        "requiredPopulated": 1,
+        "allPopulated": 3,
+        "missingRequired": [
+          "deliveryDate",
+          "deliveryAddress"
+        ],
+        "goldenLooseHits": 2,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "근조 - 3단",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-16"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "3",
+            "status": "review",
+            "confidence": 78,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-16"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [
+              "line-11"
+            ],
+            "goldenLooseHit": false
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientName": {
+            "value": "고인 김기회",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-23"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      }
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_07.jpg",
+      "summary": {
+        "documentConfidence": 55,
+        "requiredPopulated": 2,
+        "allPopulated": 2,
+        "missingRequired": [
+          "deliveryDate"
+        ],
+        "goldenLooseHits": 1,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "영",
+            "status": "warning",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-4"
+            ],
+            "goldenLooseHit": false
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "서울 구로구 고려대 구로병원 장례식장 105호",
+            "status": "review",
+            "confidence": 84,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-19"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      }
+    }
+  ],
+  "bestSampleResults": [
+    {
+      "file": "KakaoTalk_20260621_070828835.jpg",
+      "summary": {
+        "documentConfidence": 83,
+        "requiredPopulated": 3,
+        "allPopulated": 6,
+        "missingRequired": [],
+        "goldenLooseHits": 3,
+        "fields": {
+          "orderingVendorName": {
+            "value": "아뜰리에몽들라워",
+            "status": "review",
+            "confidence": 70,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-4",
+              "line-13"
+            ],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "축하 - 축하3단",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-15"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "3",
+            "status": "review",
+            "confidence": 78,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-15"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-7",
+              "line-16",
+              "line-20"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "서을 영등포구 공군흐텔 그랜드스를 s종",
+            "status": "warning",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-10",
+              "line-22"
+            ],
+            "goldenLooseHit": false
+          },
+          "recipientName": {
+            "value": "신부 선 단비",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-19"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      },
+      "spatialCandidateKeys": [
+        "orderingVendorName",
+        "productName",
+        "productQuantity",
+        "ribbonText",
+        "deliveryDate",
+        "deliveryAddress",
+        "recipientName"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_01.jpg",
+      "summary": {
+        "documentConfidence": 80,
+        "requiredPopulated": 3,
+        "allPopulated": 6,
+        "missingRequired": [],
+        "goldenLooseHits": 3,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "warning",
+            "confidence": 0,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-2",
+              "line-14"
+            ],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "warning",
+            "confidence": 0,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-3",
+              "line-22",
+              "line-14"
+            ],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "축하화환 FA248] 축하화환 3단",
+            "status": "review",
+            "confidence": 80,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-4",
+              "line-14"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "review",
+            "confidence": 81,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-5",
+              "line-20",
+              "line-22"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "11:00",
+            "status": "review",
+            "confidence": 86,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-22"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "영등포구 가마산로 538 해군호텔 W웨딩홀",
+            "status": "review",
+            "confidence": 80,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-6",
+              "line-19"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "ST-FA248 경조사어] 하(축화훈)",
+            "status": "review",
+            "confidence": 70,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-20",
+              "line-21"
+            ],
+            "goldenLooseHit": false
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "배송 기사님께서는 배송완료 후 즉시 [3070-4741-0001 ]로 전화주세요",
+            "status": "review",
+            "confidence": 71,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-9",
+              "line-33"
+            ],
+            "goldenLooseHit": false
+          }
+        }
+      },
+      "spatialCandidateKeys": [
+        "orderingVendorName",
+        "fulfillingVendorName",
+        "productName",
+        "ribbonText",
+        "deliveryDate",
+        "deliveryAddress",
+        "recipientName",
+        "memo"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_02.jpg",
+      "summary": {
+        "documentConfidence": 87,
+        "requiredPopulated": 3,
+        "allPopulated": 6,
+        "missingRequired": [],
+        "goldenLooseHits": 5,
+        "fields": {
+          "orderingVendorName": {
+            "value": "",
+            "status": "warning",
+            "confidence": 0,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-3",
+              "line-12"
+            ],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "착한근조-",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-4",
+              "line-13"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "1",
+            "status": "review",
+            "confidence": 76,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-27"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "review",
+            "confidence": 92,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-21"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "서울 동작구 중앙대병원 장례식장 5호",
+            "status": "review",
+            "confidence": 84,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-14"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "고 박희순",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-15"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientTel": {
+            "value": "031-841-9861",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-18",
+              "line-30"
+            ],
+            "goldenLooseHit": true
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      },
+      "spatialCandidateKeys": [
+        "orderingVendorName",
+        "productName",
+        "productQuantity",
+        "ribbonText",
+        "deliveryDate",
+        "deliveryAddress",
+        "recipientName",
+        "recipientTel"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_03.jpg",
+      "summary": {
+        "documentConfidence": 86,
+        "requiredPopulated": 3,
+        "allPopulated": 8,
+        "missingRequired": [],
+        "goldenLooseHits": 4,
+        "fields": {
+          "orderingVendorName": {
+            "value": "8403",
+            "status": "review",
+            "confidence": 70,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-3",
+              "line-12"
+            ],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "근조3단 -",
+            "status": "confirmed",
+            "confidence": 83,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-4",
+              "line-13"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "1",
+            "status": "review",
+            "confidence": 76,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-27"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "review",
+            "confidence": 92,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-23"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "서울 영등포구 선유로 101 교원예욱 서서울 장례식장 201호",
+            "status": "review",
+            "confidence": 84,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-25"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "고인 심명철",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-15"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientTel": {
+            "value": "010-8348-8403",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-18",
+              "line-26"
+            ],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "현장사진 부탁드립니다.",
+            "status": "review",
+            "confidence": 69,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-10",
+              "line-33"
+            ],
+            "goldenLooseHit": false
+          }
+        }
+      },
+      "spatialCandidateKeys": [
+        "orderingVendorName",
+        "productName",
+        "productQuantity",
+        "ribbonText",
+        "deliveryDate",
+        "deliveryAddress",
+        "recipientName",
+        "recipientTel",
+        "memo"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_04.jpg",
+      "summary": {
+        "documentConfidence": 82,
+        "requiredPopulated": 3,
+        "allPopulated": 6,
+        "missingRequired": [],
+        "goldenLooseHits": 2,
+        "fields": {
+          "orderingVendorName": {
+            "value": "TFP-NO 100 OPT",
+            "status": "review",
+            "confidence": 70,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-3",
+              "line-9"
+            ],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "warning",
+            "confidence": 0,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-4",
+              "line-5",
+              "line-17",
+              "line-9"
+            ],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "근조화환 1개 (새꽃정 풀화환 )",
+            "status": "review",
+            "confidence": 75,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-8",
+              "line-13"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "review",
+            "confidence": 92,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-34"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "고대구로 병원 장례식창 105.호실",
+            "status": "review",
+            "confidence": 79,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-18",
+              "line-28"
+            ],
+            "goldenLooseHit": false
+          },
+          "recipientName": {
+            "value": "명",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-22"
+            ],
+            "goldenLooseHit": false
+          },
+          "recipientTel": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "보내는분",
+            "status": "review",
+            "confidence": 68,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-12",
+              "line-19"
+            ],
+            "goldenLooseHit": false
+          }
+        }
+      },
+      "spatialCandidateKeys": [
+        "orderingVendorName",
+        "fulfillingVendorName",
+        "productName",
+        "ribbonText",
+        "deliveryDate",
+        "deliveryAddress",
+        "recipientName",
+        "memo"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_05.jpg",
+      "summary": {
+        "documentConfidence": 82,
+        "requiredPopulated": 3,
+        "allPopulated": 5,
+        "missingRequired": [],
+        "goldenLooseHits": 3,
+        "fields": {
+          "orderingVendorName": {
+            "value": "미입력",
+            "status": "review",
+            "confidence": 70,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-6",
+              "line-15"
+            ],
+            "goldenLooseHit": false
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "근조 -",
+            "status": "confirmed",
+            "confidence": 82,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-8",
+              "line-16"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "confirmed",
+            "confidence": 82,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-9",
+              "line-30",
+              "line-17",
+              "line-26"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "1이 대특동병원 장례식장 7횟",
+            "status": "review",
+            "confidence": 81,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-13",
+              "line-27"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "recipientTel": {
+            "value": "02-409-7796",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-25",
+              "line-31"
+            ],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      },
+      "spatialCandidateKeys": [
+        "orderingVendorName",
+        "productName",
+        "ribbonText",
+        "deliveryDate",
+        "deliveryAddress",
+        "recipientTel"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_06.jpg",
+      "summary": {
+        "documentConfidence": 83,
+        "requiredPopulated": 3,
+        "allPopulated": 7,
+        "missingRequired": [],
+        "goldenLooseHits": 5,
+        "fields": {
+          "orderingVendorName": {
+            "value": "KDFC한일농원",
+            "status": "review",
+            "confidence": 70,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-4",
+              "line-14"
+            ],
+            "goldenLooseHit": true
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "근조 - 3단",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-16"
+            ],
+            "goldenLooseHit": true
+          },
+          "productQuantity": {
+            "value": "3",
+            "status": "review",
+            "confidence": 78,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-16"
+            ],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-11",
+              "line-26"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "서울 보라매병원 1호",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-9",
+              "line-22"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "고인 김기회",
+            "status": "review",
+            "confidence": 82,
+            "extractionMethod": "label",
+            "sourceLineIds": [
+              "line-23"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientTel": {
+            "value": "010-5239-6770",
+            "status": "review",
+            "confidence": 76,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-25"
+            ],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          }
+        }
+      },
+      "spatialCandidateKeys": [
+        "orderingVendorName",
+        "productName",
+        "productQuantity",
+        "ribbonText",
+        "deliveryDate",
+        "deliveryAddress",
+        "recipientName",
+        "recipientTel"
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_07.jpg",
+      "summary": {
+        "documentConfidence": 83,
+        "requiredPopulated": 3,
+        "allPopulated": 6,
+        "missingRequired": [],
+        "goldenLooseHits": 4,
+        "fields": {
+          "orderingVendorName": {
+            "value": "99플라워",
+            "status": "review",
+            "confidence": 67,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-2",
+              "line-11"
+            ],
+            "goldenLooseHit": true
+          },
+          "fulfillingVendorName": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "productName": {
+            "value": "영",
+            "status": "warning",
+            "confidence": 82,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-4"
+            ],
+            "goldenLooseHit": false
+          },
+          "productQuantity": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryDate": {
+            "value": "2026-06-14",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-5",
+              "line-16"
+            ],
+            "goldenLooseHit": true
+          },
+          "eventTime": {
+            "value": "",
+            "status": "missing",
+            "confidence": 0,
+            "extractionMethod": "",
+            "sourceLineIds": [],
+            "goldenLooseHit": false
+          },
+          "deliveryAddress": {
+            "value": "서울 구로구 고려대 구로병원 장례식장 105호",
+            "status": "review",
+            "confidence": 84,
+            "extractionMethod": "pattern",
+            "sourceLineIds": [
+              "line-19"
+            ],
+            "goldenLooseHit": true
+          },
+          "recipientName": {
+            "value": "",
+            "status": "warning",
+            "confidence": 0,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-10",
+              "line-30"
+            ],
+            "goldenLooseHit": false
+          },
+          "recipientTel": {
+            "value": "010-2479-1488",
+            "status": "confirmed",
+            "confidence": 84,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-29",
+              "line-36"
+            ],
+            "goldenLooseHit": false
+          },
+          "memo": {
+            "value": "최대한 빼른 배송해주세요",
+            "status": "review",
+            "confidence": 69,
+            "extractionMethod": "layout",
+            "sourceLineIds": [
+              "line-9",
+              "line-21"
+            ],
+            "goldenLooseHit": true
+          }
+        }
+      },
+      "spatialCandidateKeys": [
+        "orderingVendorName",
+        "ribbonText",
+        "deliveryDate",
+        "deliveryAddress",
+        "recipientName",
+        "recipientTel",
+        "memo"
+      ]
+    }
+  ],
+  "topConfigs": [
+    {
+      "config": {
+        "sameRowYRatio": 0.018,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.55,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.07,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.018,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.55,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.105,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.018,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.72,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.07,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.018,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.72,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.105,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.018,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.9,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.07,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.018,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.9,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.105,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.022,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.55,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.07,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.022,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.55,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.105,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.022,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.72,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.07,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    },
+    {
+      "config": {
+        "sameRowYRatio": 0.022,
+        "xLeftSlackRatio": 0.015,
+        "xRightGrowRatio": 0.72,
+        "yUpSlackRatio": 0.12,
+        "yDownGrowRatio": 0.105,
+        "maxCandidatesPerAnchor": 3
+      },
+      "aggregate": {
+        "requiredPopulated": 24,
+        "allPopulated": 50,
+        "goldenLooseHits": 29,
+        "documentConfidence": 83.25,
+        "score": 5258
+      }
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import { applyOfficialOcrFieldGuardrails } from '../ocr/fieldValidation';
 import { buildLayoutText } from '../ocr/layout';
 import { normalizeReceipt } from '../ocr/normalize';
 import { enrichOcrPipelineResult } from './ocrMetadata';
+import { applySpatialOcrFieldHeuristics } from './ocrSpatialHeuristics';
 
 type ImageAssetInfo = {
   uri?: string;
@@ -824,7 +825,14 @@ export async function runReceiptOcr(
       receiptEvidenceScore(layoutText) >= receiptEvidenceScore(recognized.fullText)
         ? layoutText
         : recognized.fullText;
-    const parsed = parseReceiptText(textForParsing, quality);
+    const parsed = applySpatialOcrFieldHeuristics(
+      parseReceiptText(textForParsing, quality),
+      recognized.lines || [],
+      {
+        width: asset.width,
+        height: asset.height,
+      },
+    );
     assertUsefulOcrEvidence(textForParsing, parsed);
     return enrichOcrPipelineResult({
       ...parsed,
