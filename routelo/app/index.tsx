@@ -3302,6 +3302,7 @@ function OcrScannerModal({
         // 이 한 장의 OCR 결과를 그대로 검토 화면으로 보낸다(#124). 유저가 갤러리
         // 인수증 1장으로 즉시 인식하는 실사용 경로다. 약한/부분 필드는 검토
         // 화면에서 사용자가 확인·보정한다(자동 등록 아님, zero-fabrication 유지).
+        // 앞서 카메라로 누적한 aggregate가 있어도 단일샷 결과로 대체한다(의도된 시맨틱).
         setAggregateResult(next);
         setLiveSession(createInitialLiveOcrSession());
         setResult(next);
