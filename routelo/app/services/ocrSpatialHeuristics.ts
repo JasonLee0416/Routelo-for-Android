@@ -72,6 +72,10 @@ const REQUIRED = new Set<OcrFieldKey>([
   'deliveryAddress',
 ]);
 
+// 8샘플 243조합 스윕의 "최적값"이 아니라 각 범위의 중간값을 의도적으로 쓴다.
+// 8장에 맞춘 최적값은 과적합 위험이 크다. 어차피 공간 채움 값은 항상 review
+// 상태로 남으므로 상수 미세 튜닝이 신뢰 판정에 직접 영향을 주지 않는다.
+// (스윕 리포트의 수치는 이 중간값 설정이 아닌 최적값 기준이라 프로덕션과 다름.)
 export const DEFAULT_SPATIAL_HEURISTIC_CONSTANTS: SpatialHeuristicConstants = {
   sameRowYRatio: 0.022,
   xLeftSlackRatio: 0.028,
@@ -95,11 +99,15 @@ const ANCHOR_ALIASES: Partial<Record<OcrFieldKey, string[]>> = {
   memo: ['요구사항', '요청사항', '특이사항', '비고'],
 };
 
+// /g 플래그를 쓰면 .test()가 lastIndex를 전진시켜 호출마다 결과가 뒤집힌다
+// (recipientTel 후보 필터가 순서 의존적으로 불안정해짐). non-global로 둔다.
 const PHONE_PATTERN =
-  /(?<!\d)(?:01[016789][-\s]?\d{3,4}[-\s]?\d{4}|02[-\s]?\d{3,4}[-\s]?\d{4}|0[3-6]\d[-\s]?\d{3,4}[-\s]?\d{4})(?!\d)/g;
+  /(?<!\d)(?:01[016789][-\s]?\d{3,4}[-\s]?\d{4}|02[-\s]?\d{3,4}[-\s]?\d{4}|0[3-6]\d[-\s]?\d{3,4}[-\s]?\d{4})(?!\d)/;
 
+// 지역명 + 도로/행정동 구조를 요구한다. 오탈자(서을·열등포구)나 장소단서만으로
+// 주소를 인정하면 오인식 텍스트가 필드로 들어온다(fieldValidation과 동일 기준).
 const ADDRESS_HINT =
-  /(?:서울|서을|경기|인천|강원|충청|충북|충남|전라|전북|전남|경상|경북|경남|부산|대구|대전|광주|울산|세종|제주|구로구|영등포구|열등포구|엉등포구|마포구|동작구|강서구|용인시|의정부시|[가-힣]{1,12}(?:시|군|구)\s|[가-힣0-9]{1,20}(?:로|길)\s*\d|병원|장례식장|웨딩|호텔|예식장|홀|호실|층)/u;
+  /(?:서울|경기|인천|강원|충청|충북|충남|전라|전북|전남|경상|경북|경남|부산|대구|대전|광주|울산|세종|제주|[가-힣]{1,12}(?:시|군|구)\s+[가-힣0-9]{1,20}(?:로|길|동|읍|면|리))/u;
 
 const ADDRESS_EXCLUDE_HINT = /(?:반드시|정자로|이름으로|받는분|받으실분|인수자|관계)/u;
 
@@ -144,16 +152,10 @@ function trimLeadingSeparators(value: string) {
 
 function looksLikeAddress(value: string) {
   const text = value.normalize('NFKC');
-  const compacted = removeSeparators(text);
-  return (
-    ADDRESS_HINT.test(text) ||
-    ['서울', '서을', '경기', '인천', '구로구', '영등포구', '열등포구', '엉등포구'].some(
-      (hint) => text.includes(hint),
-    ) ||
-    /[가-힣]{1,12}(?:시|군|구)\s/u.test(text) ||
-    /(?:로|길)\s*\d/u.test(text) ||
-    /(병원|장례식장|웨딩|호텔|예식장|홀|호실|층)/u.test(compacted)
-  );
+  // 주소로 인정하는 근거는 두 가지뿐이다: ①지역명+도로/행정동 구조(ADDRESS_HINT),
+  // ②'…로/길 123' 도로명주소. 오탈자 화이트리스트나 장소단서(병원·호텔·홀)만으로는
+  // 인정하지 않는다 — 오인식 텍스트가 신뢰 주소로 새어나가지 않도록.
+  return ADDRESS_HINT.test(text) || /[가-힣0-9]{1,20}(?:로|길)\s*\d/u.test(text);
 }
 
 const compact = (value: string) =>
@@ -540,7 +542,10 @@ function makeField(candidate: SpatialFieldCandidate): OcrFieldResult {
     sourceLineIds: candidate.sourceLineIds,
     extractionMethod: 'layout',
     alternatives: [],
-    status: candidate.confidence >= 82 ? 'confirmed' : 'review',
+    // 공간 근접은 "라벨 옆 텍스트"라는 추정일 뿐 검증된 값이 아니다. 근접도로
+    // 매긴 신뢰도가 아무리 높아도 'confirmed'로 올리지 않는다. 독립 검증
+    // (예: addressVerification)을 거치기 전까지는 항상 사용자 검토 대상.
+    status: 'review',
   };
 }
 
@@ -587,14 +592,12 @@ export function applySpatialOcrFieldHeuristics(
     };
   });
   const guardedFields = applyOfficialOcrFieldGuardrails(nextFields);
-  const requiredFields = guardedFields.filter((item) => item.required);
-  const documentConfidence = Math.round(
-    requiredFields.reduce((sum, item) => sum + item.confidence, 0) /
-      Math.max(requiredFields.length, 1),
-  );
+  // documentConfidence는 재계산하지 않는다. 공간 채움 필드의 자체 신뢰도를
+  // 평균내면 근접 추정 점수가 문서 신뢰도로 둔갑해, ocrMetadata의 <82 게이트를
+  // 통과시켜 저신뢰 문서의 리뷰/클라우드 폴백 에스컬레이션을 침묵시킨다.
+  // 공간 매핑은 '값 후보 제안'일 뿐이므로 엔진이 낸 원래 문서 신뢰도를 유지한다.
   return {
     ...result,
     fields: guardedFields,
-    documentConfidence,
   };
 }

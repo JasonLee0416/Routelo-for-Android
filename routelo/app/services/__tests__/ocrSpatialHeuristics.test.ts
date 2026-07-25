@@ -135,6 +135,77 @@ describe('OCR spatial field heuristics', () => {
     expect(byKey.deliveryDate.value).toBe('2026-06-14');
     expect(byKey.deliveryAddress.value).toContain('구로구');
     expect(byKey.deliveryAddress.sourceText).toContain('배송장소');
-    expect(result.documentConfidence).toBeGreaterThan(70);
+  });
+
+  it('never marks spatially-recovered fields as confirmed', () => {
+    const result = applySpatialOcrFieldHeuristics(
+      emptyPipeline(),
+      [
+        { text: '배송장소', boundingBox: { x: 500, y: 1060, width: 190, height: 70 } },
+        {
+          text: '서울 구로구 가마산로 538',
+          boundingBox: { x: 820, y: 1055, width: 980, height: 85 },
+        },
+      ],
+      { width: 2400, height: 1800 },
+    );
+    const address = result.fields.find((f) => f.key === 'deliveryAddress');
+    // 근접 추정은 검증된 값이 아니므로 항상 검토 대상으로 남아야 한다.
+    expect(address?.value).toContain('구로구');
+    expect(address?.status).toBe('review');
+    expect(result.fields.every((f) => f.status !== 'confirmed')).toBe(true);
+  });
+
+  it('does not inflate documentConfidence from proximity scores', () => {
+    // 공간 채움이 자체 신뢰도를 문서 신뢰도로 둔갑시켜 리뷰 에스컬레이션을
+    // 침묵시키면 안 된다. 엔진이 낸 원래 문서 신뢰도(여기선 0)를 유지한다.
+    const result = applySpatialOcrFieldHeuristics(
+      emptyPipeline(),
+      [
+        { text: '배달일시', boundingBox: { x: 500, y: 1030, width: 220, height: 75 } },
+        {
+          text: '2026년 06월 14일 예식 12시20분',
+          boundingBox: { x: 830, y: 1025, width: 900, height: 80 },
+        },
+      ],
+      { width: 2400, height: 1800 },
+    );
+    expect(result.fields.find((f) => f.key === 'deliveryDate')?.value).toBe(
+      '2026-06-14',
+    );
+    expect(result.documentConfidence).toBe(0);
+  });
+
+  it('does not accept misspelled or venue-only text as an address', () => {
+    const result = applySpatialOcrFieldHeuristics(
+      emptyPipeline(),
+      [
+        { text: '배송장소', boundingBox: { x: 500, y: 1060, width: 190, height: 70 } },
+        // '서을'은 오탈자, '해군호텔 3층'은 장소단서뿐 — 신뢰 주소로 통과하면 안 된다.
+        {
+          text: '서을 해군호텔 3층',
+          boundingBox: { x: 820, y: 1055, width: 980, height: 85 },
+        },
+      ],
+      { width: 2400, height: 1800 },
+    );
+    const address = result.fields.find((f) => f.key === 'deliveryAddress');
+    expect(address?.value ?? '').toBe('');
+    expect(address?.status).not.toBe('confirmed');
+  });
+
+  it('leaves a required field missing when no plausible value is nearby', () => {
+    const result = applySpatialOcrFieldHeuristics(
+      emptyPipeline(),
+      [
+        { text: '배달장소', boundingBox: { x: 500, y: 1200, width: 220, height: 75 } },
+        // 라벨은 있으나 근처에 주소로 볼 만한 텍스트가 없다 → 필드를 지어내지 않는다.
+        { text: '감사합니다', boundingBox: { x: 830, y: 1195, width: 300, height: 85 } },
+      ],
+      { width: 2400, height: 1800 },
+    );
+    const address = result.fields.find((f) => f.key === 'deliveryAddress');
+    expect(address?.value ?? '').toBe('');
+    expect(address?.status).toBe('missing');
   });
 });
