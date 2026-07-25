@@ -270,10 +270,11 @@ export async function inspectReceiptImageQuality(
         : variance,
     );
 
+    const blownRatio = blownPixels / Math.max(1, pixels);
     const brightness = scoreBrightness(
       mean,
       darkPixels / Math.max(1, pixels),
-      blownPixels / Math.max(1, pixels),
+      blownRatio,
     );
     const blur = scoreSharpness(laplacianVariance);
     const documentCoverage = scoreCoverage(boxRatio, paperRatio);
@@ -298,12 +299,14 @@ export async function inspectReceiptImageQuality(
     if (blur < 55) {
       messages.push('실측 선명도가 낮습니다. 흔들림을 줄이고 초점을 다시 맞춰주세요.');
     }
+    // 밝은 쪽은 감점이 완만해 brightness<55는 사실상 저조도에서만 발생한다.
     if (brightness < 55) {
-      messages.push(
-        mean > BRIGHTNESS_IDEAL
-          ? '화면 반사·과노출로 글자가 날아갑니다. 조명 반사를 줄이거나 각도를 바꿔 촬영하세요.'
-          : '실측 밝기가 낮습니다. 그림자를 피하고 더 밝은 곳에서 촬영하세요.',
-      );
+      messages.push('실측 밝기가 낮습니다. 그림자를 피하고 더 밝은 곳에서 촬영하세요.');
+    }
+    // 과노출/반사는 밝기 점수와 별개로, 완전 흰 픽셀 비율로 감지해 안내한다.
+    // 정상 흰 배경 문서(blown ~0.35~0.5)는 통과, 글자가 날아갈 수준(0.6+)만 경고.
+    if (blownRatio > 0.6) {
+      messages.push('화면 반사·과노출로 글자가 날아갈 수 있습니다. 조명 반사를 줄이거나 각도를 바꿔 촬영하세요.');
     }
     if (documentCoverage < 58) {
       messages.push('인수증 종이 영역이 충분히 크게 잡히지 않았습니다. 화면을 더 꽉 채워주세요.');

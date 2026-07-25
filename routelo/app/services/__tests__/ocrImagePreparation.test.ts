@@ -2,11 +2,11 @@ import { BRIGHTNESS_IDEAL, scoreBrightness } from '../ocrImagePreparation';
 
 describe('scoreBrightness (#122 overexposure gate)', () => {
   it('does not reject a bright white-background document as under-lit', () => {
-    // 흰 배경이 큰 스캔/캡처 문서는 mean이 0.9 안팎으로 높은 게 정상.
-    // 예전 대칭 감점(|mean-0.66|*115 + blown*45)이면 40 미만으로 막혔지만,
-    // 이제 밝은 쪽은 약하게 감점하므로 게이트(55)를 통과해야 한다.
-    const score = scoreBrightness(0.9, 0.02, 0.35);
-    expect(score).toBeGreaterThanOrEqual(55);
+    // 흰 배경이 큰 스캔/캡처 문서는 mean이 0.9 안팎이고 blown 비율이 높은 게 정상.
+    // 예전 대칭 감점(|mean-0.66|*115 + blown*45)이면 (0.92,0,0.5)=48로 막혔지만,
+    // 이제 밝은 쪽은 약하게 감점하므로 게이트(55)를 통과해야 한다(새 공식 76).
+    expect(scoreBrightness(0.92, 0, 0.5)).toBeGreaterThanOrEqual(55);
+    expect(scoreBrightness(0.9, 0.02, 0.35)).toBeGreaterThanOrEqual(55);
   });
 
   it('still penalizes genuinely dark (low-contrast) frames hard', () => {
