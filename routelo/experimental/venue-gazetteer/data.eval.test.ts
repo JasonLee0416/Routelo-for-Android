@@ -113,3 +113,28 @@ describe('gyeonggi gazetteer (real data)', () => {
     ).toContain('시엠프레');
   });
 });
+
+const iFuneral: VenueEntry[] = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'data/incheon-funeral.json'), 'utf8'),
+);
+const iWedding: VenueEntry[] = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'data/incheon-wedding.json'), 'utf8'),
+);
+
+describe('incheon gazetteer (real data)', () => {
+  it('JSON이 유효하고 장례식장 35·예식장 40을 가진다', () => {
+    expect(iFuneral.length).toBe(35);
+    expect(iWedding.length).toBe(40);
+  });
+
+  it('인천 배송지가 올바른 장소로 매칭된다', () => {
+    expect(
+      matchVenue('인천 남동구 가천대길병원 장례식장 특2호', iFuneral, { type: 'funeral' })[0]
+        ?.entry.name,
+    ).toContain('가천대길병원');
+    // 별칭(길병원장례식장)으로도 매칭
+    expect(
+      matchVenue('길병원장례식장', iFuneral, { type: 'funeral' })[0]?.entry.name,
+    ).toContain('가천대길병원');
+  });
+});
