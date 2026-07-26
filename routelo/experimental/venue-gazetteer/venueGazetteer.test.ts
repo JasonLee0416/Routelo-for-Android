@@ -29,9 +29,11 @@ const FIXTURE: VenueEntry[] = [
 ];
 
 describe('venue gazetteer matcher', () => {
-  it('정규화가 호실/층 꼬리를 제거한다', () => {
-    expect(normalizeVenue('고대구로병원 장례식장 105호실')).toBe('고대구로병원장례식장');
-    expect(normalizeVenue('중앙대병원 장례식장 5호')).toBe('중앙대병원장례식장');
+  it('정규화는 공백·구두점만 제거한다(적극 정규화 안 함 — 누락 방지)', () => {
+    expect(normalizeVenue('고대구로병원 장례식장')).toBe('고대구로병원장례식장');
+    expect(normalizeVenue('더채플앳 청담')).toBe('더채플앳청담');
+    // 호실/층·일반 홀명은 제거하지 않는다.
+    expect(normalizeVenue('공군호텔 웨딩홀')).toBe('공군호텔웨딩홀');
   });
 
   it('OCR 배송지에서 정규 장례식장을 후보로 찾는다', () => {
