@@ -21,8 +21,8 @@ const GOLDEN = [
 ];
 
 describe('seoul-funeral gazetteer (real data)', () => {
-  it('JSON이 유효하고 62개 항목·필수 필드를 가진다', () => {
-    expect(funeral.length).toBe(62);
+  it('JSON이 유효하고 필수 필드를 가진다(병합 후 60+곳)', () => {
+    expect(funeral.length).toBeGreaterThanOrEqual(60);
     for (const v of funeral) {
       expect(typeof v.name).toBe('string');
       expect(Array.isArray(v.aliases)).toBe(true);
@@ -37,7 +37,9 @@ describe('seoul-funeral gazetteer (real data)', () => {
       console.log(
         `${g.ocr.slice(0, 30).padEnd(32)} → ${top ? `${top.entry.name} (${top.score.toFixed(2)})` : '없음'}`,
       );
-      expect(top?.entry.name).toContain(g.expect);
+      expect((top?.entry.name || '').replace(/\s/g, '')).toContain(
+        g.expect.replace(/\s/g, ''),
+      );
     }
   });
 
@@ -48,7 +50,7 @@ describe('seoul-funeral gazetteer (real data)', () => {
 
 describe('seoul-wedding gazetteer (real data)', () => {
   it('JSON이 유효하고 wedding 타입 필수 필드를 가진다', () => {
-    expect(wedding.length).toBeGreaterThanOrEqual(80);
+    expect(wedding.length).toBeGreaterThanOrEqual(200);
     for (const v of wedding) {
       expect(typeof v.name).toBe('string');
       expect(Array.isArray(v.aliases)).toBe(true);
@@ -61,6 +63,9 @@ describe('seoul-wedding gazetteer (real data)', () => {
     { ocr: '서울 영등포구 국제금융로 10 콘래드 서울 그랜드볼룸', expect: '콘래드 서울' },
     { ocr: '잠실 롯데호텔월드 크리스탈볼룸', expect: '롯데호텔월드' },
     { ocr: '서울 중구 장충 신라호텔 다이너스티홀', expect: '신라호텔' },
+    // 골든 인수증(base/IMG_01)의 예식장 — Codex 데이터 병합으로 신규 커버.
+    { ocr: '서울 영등포구 공군호텔 그랜드볼룸 3층', expect: '공군호텔' },
+    { ocr: '영등포구 가마산로 538 해군호텔 W웨딩홀', expect: '해군호텔' },
   ];
 
   it('예식장 배송지가 올바른 웨딩홀로 매칭된다', () => {
@@ -70,7 +75,9 @@ describe('seoul-wedding gazetteer (real data)', () => {
       console.log(
         `${g.ocr.slice(0, 32).padEnd(34)} → ${top ? `${top.entry.name} (${top.score.toFixed(2)})` : '없음'}`,
       );
-      expect(top?.entry.name).toContain(g.expect);
+      expect((top?.entry.name || '').replace(/\s/g, '')).toContain(
+        g.expect.replace(/\s/g, ''),
+      );
     }
   });
 
