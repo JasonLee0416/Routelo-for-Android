@@ -1,5 +1,12 @@
 # 실험: 장소 가제티어(Venue Gazetteer) — OCR 상호명/배송지 보강
 
+> 📌 **추적**: PR [#129](https://github.com/JasonLee0416/Routelo-for-Android/pull/129) (Draft·미병합) · 후속 이슈
+> [#130](https://github.com/JasonLee0416/Routelo-for-Android/issues/130) 프로덕션 편입 결정 ·
+> [#131](https://github.com/JasonLee0416/Routelo-for-Android/issues/131) 매칭 tail-noise ·
+> [#132](https://github.com/JasonLee0416/Routelo-for-Android/issues/132) 내부 near-dup 검토 ·
+> [#133](https://github.com/JasonLee0416/Routelo-for-Android/issues/133) 인천 행정구역 crosswalk ·
+> [#134](https://github.com/JasonLee0416/Routelo-for-Android/issues/134) 데이터 최신성 갱신
+
 > ⚠️ **실험 영역 (experimental) — 프로덕션 병합 금지.**
 > 이 디렉터리는 실험적 아이디어를 검증하기 위한 격리 공간이다. `app/` 런타임에
 > import 되지 않으며, CI 게이트/제품 동작에 영향을 주지 않는다. 검증이 끝나면
