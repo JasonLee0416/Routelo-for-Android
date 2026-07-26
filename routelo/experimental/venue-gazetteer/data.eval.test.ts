@@ -84,3 +84,32 @@ describe('seoul-wedding gazetteer (real data)', () => {
     expect(m[0]?.entry.name).toContain('중앙대학교병원');
   });
 });
+
+const gFuneral: VenueEntry[] = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'data/gyeonggi-funeral.json'), 'utf8'),
+);
+const gWedding: VenueEntry[] = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'data/gyeonggi-wedding.json'), 'utf8'),
+);
+
+describe('gyeonggi gazetteer (real data)', () => {
+  it('JSON이 유효하고 장례식장 183·예식장 182를 가진다', () => {
+    expect(gFuneral.length).toBe(183);
+    expect(gWedding.length).toBe(182);
+    for (const v of [...gFuneral, ...gWedding]) {
+      expect(typeof v.name).toBe('string');
+      expect(['funeral', 'wedding']).toContain(v.type);
+    }
+  });
+
+  it('경기 배송지가 올바른 장소로 매칭된다', () => {
+    expect(
+      matchVenue('경기 수원시 아주대학교병원 장례식장 3층', gFuneral, { type: 'funeral' })[0]
+        ?.entry.name,
+    ).toContain('아주대학교병원');
+    expect(
+      matchVenue('용인시 기흥구 시엠프레 기흥점', gWedding, { type: 'wedding' })[0]?.entry
+        .name,
+    ).toContain('시엠프레');
+  });
+});
