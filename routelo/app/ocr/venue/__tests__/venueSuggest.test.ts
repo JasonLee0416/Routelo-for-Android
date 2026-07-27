@@ -1,4 +1,6 @@
 import {
+  composeVenueValue,
+  extractUnitSuffix,
   METRO_VENUES,
   suggestDeliveryVenues,
   suggestVenuesForAddress,
@@ -88,5 +90,26 @@ describe('수도권 장소 가제티어 — 배송지 후보 제안', () => {
     const sug = suggestDeliveryVenues(fields);
     const v = sug.find((s) => s.fieldKey === 'venueName');
     expect(v?.candidates[0]?.entry.name.replace(/\s/g, '')).toContain('더채플앳청담');
+  });
+
+  it('호실/층 꼬리를 추출한다', () => {
+    expect(extractUnitSuffix('서울 동작구 중앙대병원 장례식장 5호')).toBe('5호');
+    expect(extractUnitSuffix('고대구로병원 장례식장 105호실')).toBe('105호실');
+    expect(extractUnitSuffix('공군호텔 그랜드볼룸 3층')).toBe('3층');
+    expect(extractUnitSuffix('중앙대병원 장례식장')).toBe('');
+    // 도로 번지(호/층 없음)는 꼬리로 잡지 않는다.
+    expect(extractUnitSuffix('서울 구로구 구로동로 148')).toBe('');
+  });
+
+  it('장소 후보 선택 시 정규 장소명 + 호실을 유지한다', () => {
+    // 탭 시 값: 정규명에 원본의 호실/층을 이어붙여 세부 위치를 잃지 않는다.
+    expect(
+      composeVenueValue('중앙대학교병원 장례식장', '서울 동작구 중앙대병원 장례식장 5호'),
+    ).toBe('중앙대학교병원 장례식장 5호');
+    expect(
+      composeVenueValue('고려대학교구로병원 장례식장', '고대구로병원 장례식장 105호실'),
+    ).toBe('고려대학교구로병원 장례식장 105호실');
+    // 호실이 없으면 정규명만.
+    expect(composeVenueValue('신라호텔', '서울 중구 신라호텔')).toBe('신라호텔');
   });
 });

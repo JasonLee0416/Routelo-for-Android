@@ -128,7 +128,11 @@ import {
   OcrRecognizerUnavailableError,
   runReceiptOcr,
 } from './services/ocr';
-import { suggestDeliveryVenues, VenueSuggestion } from './ocr/venue';
+import {
+  composeVenueValue,
+  suggestDeliveryVenues,
+  VenueSuggestion,
+} from './ocr/venue';
 import {
   inspectReceiptImageQuality,
   prepareReceiptImageForOcr,
@@ -3660,7 +3664,10 @@ function OcrScannerModal({
                           key={`${candidate.entry.name}|${candidate.entry.district || ''}`}
                           style={styles.venueCandidateChip}
                           onPress={() =>
-                            updateField(field.key, candidate.entry.name)
+                            updateField(
+                              field.key,
+                              composeVenueValue(candidate.entry.name, field.value),
+                            )
                           }
                         >
                           <Ionicons
