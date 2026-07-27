@@ -169,7 +169,8 @@ type TabKey =
   | 'route'
   | 'notifications'
   | 'settings'
-  | 'archive';
+  | 'archive'
+  | 'contact';
 type DeliveryFilter = 'all' | 'pending' | 'completed';
 type DeliverySort = 'deadline' | 'latest' | 'fee';
 
@@ -1892,6 +1893,268 @@ function ReceiptArchiveScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
+// 관리자(개발자) 수신 주소 — UI에는 노출하지 않는다(유저에게 안 보임).
+const DEVELOPER_INQUIRY_EMAIL = 'sinsgerm@gmail.com';
+// Web3Forms 액세스 키(무료, sinsgerm@gmail.com에 연결). 값이 있으면 수신자 숨김·
+// 자동 전송·이미지 첨부가 활성화된다. 비어 있으면 기기 메일앱(mailto)으로 폴백.
+// 발급: https://web3forms.com (이메일 sinsgerm@gmail.com로 폼 생성 → access key).
+const INQUIRY_ACCESS_KEY = '';
+const INQUIRY_TYPES = ['버그·오류', '인식 오류', '기능 제안', '기타'];
+
+function ContactScreen({ onBack }: { onBack: () => void }) {
+  const { C, styles } = useTheme();
+  const [email, setEmail] = useState('');
+  const [type, setType] = useState('');
+  const [subject, setSubject] = useState('');
+  const [content, setContent] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [typeOpen, setTypeOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSubmit =
+    emailValid &&
+    !!type &&
+    subject.trim().length > 0 &&
+    content.trim().length >= 10 &&
+    !submitting;
+
+  const addImages = async () => {
+    if (images.length >= 5) {
+      Alert.alert('첨부 제한', '이미지는 최대 5장까지 첨부할 수 있습니다.');
+      return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('권한 필요', '이미지를 첨부하려면 사진 접근 권한이 필요합니다.');
+      return;
+    }
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 5 - images.length,
+    });
+    if (picked.canceled) return;
+    const uris = picked.assets.map((a) => a.uri);
+    setImages((prev) => [...prev, ...uris].slice(0, 5));
+  };
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      const title = `[ROUTELO 문의] ${type} · ${subject.trim()}`;
+      if (INQUIRY_ACCESS_KEY) {
+        // 수신자 숨김 + 자동 전송 + 이미지 첨부(Web3Forms가 개발자 메일로 라우팅).
+        const form = new FormData();
+        form.append('access_key', INQUIRY_ACCESS_KEY);
+        form.append('subject', title);
+        form.append('from_name', email.trim());
+        form.append('email', email.trim());
+        form.append('문의유형', type);
+        form.append('제목', subject.trim());
+        form.append('내용', content.trim());
+        images.forEach((uri, i) => {
+          form.append(`attachment_${i + 1}`, {
+            uri,
+            name: `attachment_${i + 1}.jpg`,
+            type: 'image/jpeg',
+          } as unknown as Blob);
+        });
+        const res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          body: form,
+        });
+        const json = (await res.json().catch(() => ({ success: false }))) as {
+          success?: boolean;
+          message?: string;
+        };
+        if (!json.success) throw new Error(json.message || '전송에 실패했습니다.');
+        Alert.alert('접수 완료', '문의가 전달되었습니다. 감사합니다.');
+      } else {
+        // 폴백: 기기 메일앱으로 개발자에게 전송(첨부는 메일앱에서 직접 추가).
+        const body =
+          `문의 유형: ${type}\n회신 이메일: ${email.trim()}\n\n${content.trim()}` +
+          (images.length
+            ? `\n\n(첨부 이미지 ${images.length}장은 메일 작성 화면에서 직접 추가해 주세요.)`
+            : '');
+        const url = `mailto:${DEVELOPER_INQUIRY_EMAIL}?subject=${encodeURIComponent(
+          title,
+        )}&body=${encodeURIComponent(body)}`;
+        const can = await Linking.canOpenURL(url);
+        if (!can) throw new Error('메일 앱을 열 수 없습니다. 기기에 메일 앱을 설정해 주세요.');
+        await Linking.openURL(url);
+      }
+      setEmail('');
+      setType('');
+      setSubject('');
+      setContent('');
+      setImages([]);
+      onBack();
+    } catch (error) {
+      Alert.alert(
+        '전송 실패',
+        error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const label = (text: string) => (
+    <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', marginBottom: 8 }}>
+      {text} <Text style={{ color: C.danger }}>*</Text>
+    </Text>
+  );
+  const field = {
+    borderWidth: 1,
+    borderColor: C.outline,
+    borderRadius: 12,
+    backgroundColor: C.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: C.text,
+    fontSize: 15,
+  } as const;
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.screenContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.archiveHeaderRow}>
+        <Pressable style={styles.iconButton} onPress={onBack} accessibilityLabel="설정으로 돌아가기">
+          <Ionicons name="chevron-back" size={22} color={C.primary} />
+        </Pressable>
+        <View style={styles.flex}>
+          <Text style={styles.eyebrow}>SUPPORT</Text>
+          <Text style={styles.screenTitle}>문의하기</Text>
+        </View>
+      </View>
+      <Text style={[styles.archiveSubtitle, { marginBottom: 16 }]}>
+        문제점·오류를 개발자에게 전달합니다. 접수 내용은 관리자에게 전송됩니다.
+      </Text>
+
+      {label('이메일')}
+      <TextInput
+        value={email}
+        onChangeText={setEmail}
+        placeholder="example@email.com"
+        placeholderTextColor={C.textMuted}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        style={field}
+      />
+      <Text style={{ color: C.textMuted, fontSize: 12, marginTop: 6, marginBottom: 18 }}>
+        답변을 받으실 이메일 주소를 입력해주세요
+      </Text>
+
+      {label('문의 유형')}
+      <Pressable
+        onPress={() => setTypeOpen(true)}
+        style={[field, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }]}
+      >
+        <Text style={{ color: type ? C.text : C.textMuted, fontSize: 15 }}>
+          {type || '문의 유형을 선택해주세요'}
+        </Text>
+        <Ionicons name="chevron-down" size={18} color={C.textMuted} />
+      </Pressable>
+
+      {label('제목')}
+      <TextInput
+        value={subject}
+        onChangeText={(t) => setSubject(t.slice(0, 200))}
+        placeholder="문의 제목을 입력해주세요"
+        placeholderTextColor={C.textMuted}
+        style={field}
+      />
+      <Text style={{ color: C.textMuted, fontSize: 12, marginTop: 6, marginBottom: 18, textAlign: 'right' }}>
+        {subject.length}/200
+      </Text>
+
+      {label('문의 내용')}
+      <TextInput
+        value={content}
+        onChangeText={(t) => setContent(t.slice(0, 5000))}
+        placeholder="문의 내용을 자세히 작성해주세요. (최소 10자)"
+        placeholderTextColor={C.textMuted}
+        multiline
+        textAlignVertical="top"
+        style={[field, { minHeight: 150 }]}
+      />
+      <Text style={{ color: C.textMuted, fontSize: 12, marginTop: 6, marginBottom: 18, textAlign: 'right' }}>
+        {content.length}/5000
+      </Text>
+
+      <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', marginBottom: 8 }}>
+        첨부 이미지{' '}
+        <Text style={{ color: C.textMuted, fontWeight: '400', fontSize: 12 }}>
+          (최대 5장, 각 5MB 이하)
+        </Text>
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
+        {images.map((uri) => (
+          <View key={uri} style={{ width: 88, height: 88 }}>
+            <Image source={{ uri }} style={{ width: 88, height: 88, borderRadius: 10 }} />
+            <Pressable
+              onPress={() => setImages((prev) => prev.filter((u) => u !== uri))}
+              accessibilityLabel="첨부 삭제"
+              style={{ position: 'absolute', top: -6, right: -6, backgroundColor: C.danger, borderRadius: 11, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Ionicons name="close" size={14} color={C.onPrimary} />
+            </Pressable>
+          </View>
+        ))}
+        {images.length < 5 && (
+          <Pressable
+            onPress={addImages}
+            accessibilityLabel="이미지 추가"
+            style={{ width: 88, height: 88, borderRadius: 10, borderWidth: 1, borderColor: C.outline, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+          >
+            <Ionicons name="add" size={24} color={C.textMuted} />
+            <Text style={{ color: C.textMuted, fontSize: 11 }}>이미지 추가</Text>
+          </Pressable>
+        )}
+      </View>
+
+      <Pressable
+        onPress={submit}
+        disabled={!canSubmit}
+        style={{ backgroundColor: canSubmit ? C.primary : C.outline, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 4 }}
+      >
+        <Text style={{ color: C.onPrimary, fontSize: 16, fontWeight: '700' }}>
+          {submitting ? '전송 중…' : '문의 등록'}
+        </Text>
+      </Pressable>
+
+      <Modal visible={typeOpen} transparent animationType="fade" onRequestClose={() => setTypeOpen(false)}>
+        <Pressable
+          onPress={() => setTypeOpen(false)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 28 }}
+        >
+          <View style={{ backgroundColor: C.surface, borderRadius: 16, overflow: 'hidden' }}>
+            {INQUIRY_TYPES.map((option, i) => (
+              <Pressable
+                key={option}
+                onPress={() => {
+                  setType(option);
+                  setTypeOpen(false);
+                }}
+                style={{ paddingVertical: 16, paddingHorizontal: 20, borderTopWidth: i === 0 ? 0 : 0.5, borderTopColor: C.outline, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <Text style={{ color: C.text, fontSize: 15 }}>{option}</Text>
+                {type === option && <Ionicons name="checkmark" size={18} color={C.primary} />}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+    </ScrollView>
+  );
+}
+
 function SettingRow({
   icon,
   title,
@@ -1926,12 +2189,14 @@ function SettingsScreen({
   onSettingsChange,
   onEditAccount,
   onOpenArchive,
+  onOpenContact,
 }: {
   account?: AccountState;
   settings: RouteloSettings;
   onSettingsChange: (settings: RouteloSettings) => void;
   onEditAccount: () => void;
   onOpenArchive: () => void;
+  onOpenContact: () => void;
 }) {
   const { C, styles } = useTheme();
   const [districtQuery, setDistrictQuery] = useState('');
@@ -2003,6 +2268,128 @@ function SettingsScreen({
         </Pressable>
       </View>
 
+      <SectionHeader title="경로 설정" />
+      <View style={styles.settingsGroup}>
+        <SettingRow icon="car-outline" title="이동 수단" caption="업무용 차량 · 자동차" />
+        <View style={styles.divider} />
+        <SettingRow
+          icon="navigate-outline"
+          title="내비게이션 앱"
+          caption="경로 안내를 넘길 앱을 선택합니다"
+        />
+        <View style={styles.navAppOptions}>
+          {(['google', 'tmap', 'naver'] as NavApp[]).map((app) => {
+            const active = settings.route.navApp === app;
+            return (
+              <Pressable
+                key={app}
+                style={[styles.navAppOption, active && styles.navAppOptionActive]}
+                onPress={() =>
+                  updateSettings({
+                    ...settings,
+                    route: { ...settings.route, navApp: app },
+                  })
+                }
+              >
+                <Text
+                  style={[
+                    styles.navAppOptionText,
+                    active && styles.navAppOptionTextActive,
+                  ]}
+                >
+                  {NAV_APP_LABEL[app]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={styles.divider} />
+        <SettingRow
+          icon="swap-vertical-outline"
+          title="수동 순서 변경"
+          caption="배송 순서를 직접 조정할 수 있습니다"
+          trailing={
+            <Switch
+              value={settings.route.allowManualReorder}
+              onValueChange={(enabled) =>
+                updateSettings({
+                  ...settings,
+                  route: { ...settings.route, allowManualReorder: enabled },
+                })
+              }
+              trackColor={{ true: C.primary }}
+            />
+          }
+        />
+      </View>
+
+      <SectionHeader
+        title="지역별 배달 수수료"
+        caption="서울 25개 자치구와 경기도 31개 시군별 금액을 회사 정책에 맞게 설정합니다."
+      />
+      <View style={styles.districtFeePanel}>
+        <TextInput
+          value={districtQuery}
+          onChangeText={setDistrictQuery}
+          placeholder="지역 검색"
+          placeholderTextColor={C.textMuted}
+          style={styles.districtSearchInput}
+        />
+        {(['Seoul', 'Gyeonggi'] as const).map((region) => {
+          const label = region === 'Seoul' ? '서울 지역' : '경기도 지역';
+          const all =
+            region === 'Seoul' ? SEOUL_DISTRICTS : GYEONGGI_DISTRICTS;
+          const visible = region === 'Seoul' ? visibleSeoul : visibleGyeonggi;
+          const fees = settings.fees.districtFees[region];
+          const expanded = openRegions[region] || normalizedQuery.length > 0;
+          return (
+            <View key={region} style={styles.districtRegion}>
+              <Pressable
+                style={styles.districtRegionHeader}
+                onPress={() =>
+                  setOpenRegions((current) => ({
+                    ...current,
+                    [region]: !current[region],
+                  }))
+                }
+              >
+                <Text style={styles.districtFeeGroupTitle}>{label}</Text>
+                <View style={styles.districtRegionRight}>
+                  <Text style={styles.districtRegionCount}>
+                    {normalizedQuery
+                      ? `${visible.length}/${all.length}`
+                      : `${all.length}개`}
+                  </Text>
+                  <Ionicons
+                    name={expanded ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={C.textMuted}
+                  />
+                </View>
+              </Pressable>
+              {expanded &&
+                visible.map((district) => (
+                  <View key={district} style={styles.districtFeeRow}>
+                    <Text style={styles.districtFeeName}>{district}</Text>
+                    <TextInput
+                      value={String(fees[district] || 0)}
+                      onChangeText={(value) => updateDistrictFee(district, value)}
+                      keyboardType="number-pad"
+                      placeholder="15000"
+                      placeholderTextColor={C.textMuted}
+                      style={styles.districtFeeInput}
+                    />
+                    <Text style={styles.districtFeeUnit}>원</Text>
+                  </View>
+                ))}
+              {expanded && normalizedQuery.length > 0 && !visible.length && (
+                <Text style={styles.districtEmptyText}>검색 결과가 없습니다</Text>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
       <SectionHeader title="인수증" />
       <View style={styles.settingsGroup}>
         <SettingRow
@@ -2011,6 +2398,34 @@ function SettingsScreen({
           caption="촬영한 인수증을 주별로 모아 보관합니다"
           onPress={onOpenArchive}
         />
+      </View>
+
+      <SectionHeader title="앱 설정" />
+      <View style={styles.settingsGroup}>
+        <SettingRow
+          icon="color-palette-outline"
+          title="화면 모드"
+          caption={settings.appearance.themeMode === 'dark' ? '다크 모드 사용 중' : '라이트 모드 사용 중'}
+          trailing={
+            <Switch
+              value={settings.appearance.themeMode === 'dark'}
+              onValueChange={(enabled) =>
+                updateSettings({
+                  ...settings,
+                  appearance: {
+                    ...settings.appearance,
+                    themeMode: enabled ? 'dark' : 'light',
+                  },
+                })
+              }
+              trackColor={{ true: C.primary }}
+            />
+          }
+        />
+        <View style={styles.divider} />
+        <SettingRow icon="language-outline" title="언어" caption="한국어" />
+        <View style={styles.divider} />
+        <SettingRow icon="information-circle-outline" title="앱 정보" caption="RouteLO 1.0.0" />
       </View>
 
       <SectionHeader title="알림 설정" />
@@ -2079,61 +2494,6 @@ function SettingsScreen({
         />
       </View>
 
-      <SectionHeader title="경로 설정" />
-      <View style={styles.settingsGroup}>
-        <SettingRow icon="car-outline" title="이동 수단" caption="업무용 차량 · 자동차" />
-        <View style={styles.divider} />
-        <SettingRow
-          icon="navigate-outline"
-          title="내비게이션 앱"
-          caption="경로 안내를 넘길 앱을 선택합니다"
-        />
-        <View style={styles.navAppOptions}>
-          {(['google', 'tmap', 'naver'] as NavApp[]).map((app) => {
-            const active = settings.route.navApp === app;
-            return (
-              <Pressable
-                key={app}
-                style={[styles.navAppOption, active && styles.navAppOptionActive]}
-                onPress={() =>
-                  updateSettings({
-                    ...settings,
-                    route: { ...settings.route, navApp: app },
-                  })
-                }
-              >
-                <Text
-                  style={[
-                    styles.navAppOptionText,
-                    active && styles.navAppOptionTextActive,
-                  ]}
-                >
-                  {NAV_APP_LABEL[app]}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <View style={styles.divider} />
-        <SettingRow
-          icon="swap-vertical-outline"
-          title="수동 순서 변경"
-          caption="배송 순서를 직접 조정할 수 있습니다"
-          trailing={
-            <Switch
-              value={settings.route.allowManualReorder}
-              onValueChange={(enabled) =>
-                updateSettings({
-                  ...settings,
-                  route: { ...settings.route, allowManualReorder: enabled },
-                })
-              }
-              trackColor={{ true: C.primary }}
-            />
-          }
-        />
-      </View>
-
       <SectionHeader title="개인정보 보호" />
       <View style={styles.settingsGroup}>
         <SettingRow
@@ -2194,98 +2554,14 @@ function SettingsScreen({
         />
       </View>
 
-      <SectionHeader title="앱 설정" />
+      <SectionHeader title="문의 · 지원" />
       <View style={styles.settingsGroup}>
         <SettingRow
-          icon="color-palette-outline"
-          title="화면 모드"
-          caption={settings.appearance.themeMode === 'dark' ? '다크 모드 사용 중' : '라이트 모드 사용 중'}
-          trailing={
-            <Switch
-              value={settings.appearance.themeMode === 'dark'}
-              onValueChange={(enabled) =>
-                updateSettings({
-                  ...settings,
-                  appearance: {
-                    ...settings.appearance,
-                    themeMode: enabled ? 'dark' : 'light',
-                  },
-                })
-              }
-              trackColor={{ true: C.primary }}
-            />
-          }
+          icon="mail-outline"
+          title="문의하기"
+          caption="문제점·오류를 개발자에게 전달합니다"
+          onPress={onOpenContact}
         />
-        <View style={styles.divider} />
-        <SettingRow icon="language-outline" title="언어" caption="한국어" />
-        <View style={styles.divider} />
-        <SettingRow icon="information-circle-outline" title="앱 정보" caption="RouteLO 1.0.0" />
-      </View>
-      <SectionHeader
-        title="지역별 배달 수수료"
-        caption="서울 25개 자치구와 경기도 31개 시군별 금액을 회사 정책에 맞게 설정합니다."
-      />
-      <View style={styles.districtFeePanel}>
-        <TextInput
-          value={districtQuery}
-          onChangeText={setDistrictQuery}
-          placeholder="지역 검색"
-          placeholderTextColor={C.textMuted}
-          style={styles.districtSearchInput}
-        />
-        {(['Seoul', 'Gyeonggi'] as const).map((region) => {
-          const label = region === 'Seoul' ? '서울 지역' : '경기도 지역';
-          const all =
-            region === 'Seoul' ? SEOUL_DISTRICTS : GYEONGGI_DISTRICTS;
-          const visible = region === 'Seoul' ? visibleSeoul : visibleGyeonggi;
-          const fees = settings.fees.districtFees[region];
-          const expanded = openRegions[region] || normalizedQuery.length > 0;
-          return (
-            <View key={region} style={styles.districtRegion}>
-              <Pressable
-                style={styles.districtRegionHeader}
-                onPress={() =>
-                  setOpenRegions((current) => ({
-                    ...current,
-                    [region]: !current[region],
-                  }))
-                }
-              >
-                <Text style={styles.districtFeeGroupTitle}>{label}</Text>
-                <View style={styles.districtRegionRight}>
-                  <Text style={styles.districtRegionCount}>
-                    {normalizedQuery
-                      ? `${visible.length}/${all.length}`
-                      : `${all.length}개`}
-                  </Text>
-                  <Ionicons
-                    name={expanded ? 'chevron-up' : 'chevron-down'}
-                    size={18}
-                    color={C.textMuted}
-                  />
-                </View>
-              </Pressable>
-              {expanded &&
-                visible.map((district) => (
-                  <View key={district} style={styles.districtFeeRow}>
-                    <Text style={styles.districtFeeName}>{district}</Text>
-                    <TextInput
-                      value={String(fees[district] || 0)}
-                      onChangeText={(value) => updateDistrictFee(district, value)}
-                      keyboardType="number-pad"
-                      placeholder="15000"
-                      placeholderTextColor={C.textMuted}
-                      style={styles.districtFeeInput}
-                    />
-                    <Text style={styles.districtFeeUnit}>원</Text>
-                  </View>
-                ))}
-              {expanded && normalizedQuery.length > 0 && !visible.length && (
-                <Text style={styles.districtEmptyText}>검색 결과가 없습니다</Text>
-              )}
-            </View>
-          );
-        })}
       </View>
     </ScrollView>
   );
@@ -4307,12 +4583,26 @@ export default function RouteloApp() {
             animateLayout(MOTION.quickMs);
             setActiveTab('archive');
           }}
+          onOpenContact={() => {
+            animateLayout(MOTION.quickMs);
+            setActiveTab('contact');
+          }}
         />
       );
     }
     if (activeTab === 'archive') {
       return (
         <ReceiptArchiveScreen
+          onBack={() => {
+            animateLayout(MOTION.quickMs);
+            setActiveTab('settings');
+          }}
+        />
+      );
+    }
+    if (activeTab === 'contact') {
+      return (
+        <ContactScreen
           onBack={() => {
             animateLayout(MOTION.quickMs);
             setActiveTab('settings');
@@ -4383,10 +4673,11 @@ export default function RouteloApp() {
           ]}
         >
           {tabs.map((tab, index) => {
-            // 보관함 화면은 설정에서 진입하므로 설정 탭을 활성으로 표시한다.
+            // 보관함·문의하기 화면은 설정에서 진입하므로 설정 탭을 활성으로 표시한다.
             const selected =
               tab.key === activeTab ||
-              (tab.key === 'settings' && activeTab === 'archive');
+              (tab.key === 'settings' &&
+                (activeTab === 'archive' || activeTab === 'contact'));
             return (
               <Pressable
                 key={tab.key}
