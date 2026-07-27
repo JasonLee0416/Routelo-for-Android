@@ -5,12 +5,16 @@ import {
   LocalContactLogRepository,
   LocalFuelLogRepository,
   LocalMileageLogRepository,
+  LocalReceiptArchiveRepository,
   LocalReceiptRepository,
   LocalRoutePlanRepository,
 } from './local';
 
 export const deliveryRepository = new LocalDeliveryRepository(AsyncStorage);
 export const receiptRepository = new LocalReceiptRepository(AsyncStorage);
+export const receiptArchiveRepository = new LocalReceiptArchiveRepository(
+  AsyncStorage,
+);
 export const routePlanRepository = new LocalRoutePlanRepository(AsyncStorage);
 export const fuelLogRepository = new LocalFuelLogRepository(AsyncStorage);
 export const mileageLogRepository = new LocalMileageLogRepository(AsyncStorage);

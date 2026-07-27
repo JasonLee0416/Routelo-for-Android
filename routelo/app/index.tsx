@@ -110,6 +110,12 @@ import {
   receiptPhotoUri,
 } from './services/completionPhoto';
 import { summarizeEfficiencyByVehicle } from './services/efficiency';
+import {
+  archiveScannedReceipt,
+  deleteArchivedReceipt,
+  listArchivedReceiptWeeks,
+  type ArchiveWeekGroup,
+} from './services/receiptArchive';
 import { buildDailyProfitCsv } from './services/export';
 import { createFuelLog } from './services/fuel';
 import { createMileageLog } from './services/mileage';
@@ -162,7 +168,8 @@ type TabKey =
   | 'calendar'
   | 'route'
   | 'notifications'
-  | 'settings';
+  | 'settings'
+  | 'archive';
 type DeliveryFilter = 'all' | 'pending' | 'completed';
 type DeliverySort = 'deadline' | 'latest' | 'fee';
 
@@ -1732,6 +1739,159 @@ function NotificationsScreen({
   );
 }
 
+function ReceiptArchiveScreen({ onBack }: { onBack: () => void }) {
+  const { C, styles } = useTheme();
+  const [weeks, setWeeks] = useState<ArchiveWeekGroup[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [preview, setPreview] = useState<string | null>(null);
+  // 파일이 사라진(백업 복원 등) 레코드의 썸네일 로드 실패를 추적해 대체 표시.
+  const [brokenIds, setBrokenIds] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let active = true;
+    listArchivedReceiptWeeks()
+      .then((next) => {
+        if (active) {
+          setWeeks(next);
+          setLoaded(true);
+        }
+      })
+      .catch(() => {
+        if (active) setLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
+  const total = weeks.reduce((sum, week) => sum + week.receipts.length, 0);
+
+  const confirmDelete = (id: string) => {
+    Alert.alert(
+      '인수증 삭제',
+      '이 인수증을 보관함에서 삭제할까요? 되돌릴 수 없습니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: () => {
+            deleteArchivedReceipt(id)
+              .catch(() => undefined)
+              .finally(() => setRefreshKey((key) => key + 1));
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.screenContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.archiveHeaderRow}>
+        <Pressable
+          style={styles.iconButton}
+          onPress={onBack}
+          accessibilityLabel="설정으로 돌아가기"
+        >
+          <Ionicons name="chevron-back" size={22} color={C.primary} />
+        </Pressable>
+        <View style={styles.flex}>
+          <Text style={styles.eyebrow}>RECEIPT ARCHIVE</Text>
+          <Text style={styles.screenTitle}>인수증 보관함</Text>
+        </View>
+      </View>
+      <Text style={styles.archiveSubtitle}>
+        촬영한 인수증 {total}건 · 주별 정리 · 삭제 전까지 보관됩니다.
+      </Text>
+
+      {loaded && total === 0 ? (
+        <View style={styles.calendarEmpty}>
+          <Ionicons name="images-outline" size={30} color={C.textMuted} />
+          <Text style={styles.calendarEmptyTitle}>보관된 인수증이 없습니다</Text>
+          <Text style={styles.calendarEmptyText}>
+            인수증을 스캔하면 이곳에 주별로 자동 보관됩니다.
+          </Text>
+        </View>
+      ) : (
+        weeks.map((week) => (
+          <View key={week.weekKey} style={styles.archiveWeekBlock}>
+            <SectionHeader title={week.label} />
+            <View style={styles.archiveGrid}>
+              {week.receipts.map((receipt) => {
+                const uri = receiptPhotoUri(receipt.imagePath);
+                const showImage = Boolean(uri) && !brokenIds[receipt.id];
+                const caption =
+                  receipt.summary?.deliveryAddress ||
+                  receipt.summary?.productName ||
+                  receipt.summary?.recipientName ||
+                  '미확인 인수증';
+                return (
+                  <View key={receipt.id} style={styles.archiveCard}>
+                    <Pressable
+                      onPress={() => showImage && uri && setPreview(uri)}
+                      accessibilityLabel="인수증 크게 보기"
+                    >
+                      {showImage && uri ? (
+                        <Image
+                          source={{ uri }}
+                          style={styles.archiveThumb}
+                          onError={() =>
+                            setBrokenIds((prev) => ({ ...prev, [receipt.id]: true }))
+                          }
+                        />
+                      ) : (
+                        <View style={[styles.archiveThumb, styles.archiveThumbEmpty]}>
+                          <Ionicons name="image-outline" size={22} color={C.textMuted} />
+                          <Text style={styles.archiveMissingText}>이미지 없음</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                    <Text style={styles.archiveCardCaption} numberOfLines={2}>
+                      {caption}
+                    </Text>
+                    <Pressable
+                      style={styles.archiveDeleteBtn}
+                      onPress={() => confirmDelete(receipt.id)}
+                      accessibilityLabel="인수증 삭제"
+                    >
+                      <Ionicons name="trash-outline" size={15} color={C.danger} />
+                      <Text style={styles.archiveDeleteText}>삭제</Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ))
+      )}
+
+      <Modal
+        visible={preview !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreview(null)}
+      >
+        <Pressable
+          style={styles.archivePreviewBackdrop}
+          onPress={() => setPreview(null)}
+        >
+          {preview ? (
+            <Image
+              source={{ uri: preview }}
+              style={styles.archivePreviewImage}
+              resizeMode="contain"
+            />
+          ) : null}
+        </Pressable>
+      </Modal>
+    </ScrollView>
+  );
+}
+
 function SettingRow({
   icon,
   title,
@@ -1765,11 +1925,13 @@ function SettingsScreen({
   settings,
   onSettingsChange,
   onEditAccount,
+  onOpenArchive,
 }: {
   account?: AccountState;
   settings: RouteloSettings;
   onSettingsChange: (settings: RouteloSettings) => void;
   onEditAccount: () => void;
+  onOpenArchive: () => void;
 }) {
   const { C, styles } = useTheme();
   const [districtQuery, setDistrictQuery] = useState('');
@@ -1839,6 +2001,16 @@ function SettingsScreen({
         <Pressable style={styles.iconButton} onPress={onEditAccount}>
           <Ionicons name="pencil-outline" size={19} color={C.primary} />
         </Pressable>
+      </View>
+
+      <SectionHeader title="인수증" />
+      <View style={styles.settingsGroup}>
+        <SettingRow
+          icon="images-outline"
+          title="인수증 보관함"
+          caption="촬영한 인수증을 주별로 모아 보관합니다"
+          onPress={onOpenArchive}
+        />
       </View>
 
       <SectionHeader title="알림 설정" />
@@ -3065,6 +3237,8 @@ function OcrScannerModal({
   const [addressVerification, setAddressVerification] =
     useState<AddressVerificationResult>();
   const [liveSession, setLiveSession] = useState(createInitialLiveOcrSession);
+  // 촬영 1건당 보관함 레코드 id(재분석 시 같은 id로 덮어써 중복 방지).
+  const archiveIdRef = useRef<string | undefined>(undefined);
   const deliveryAddressValue =
     fields.find((item) => item.key === 'deliveryAddress')?.value || '';
   // 수도권 장소 사전 후보(배송지/상호명). 매칭 없으면 빈 배열 → OCR 값 그대로.
@@ -3096,6 +3270,7 @@ function OcrScannerModal({
     setVendorCheck(undefined);
     setAddressVerification(undefined);
     setLiveSession(createInitialLiveOcrSession());
+    archiveIdRef.current = undefined;
   };
 
   const setStageAnimated = (next: ScanStage) => {
@@ -3152,6 +3327,8 @@ function OcrScannerModal({
       height: prepared.height,
       fileSize: prepared.fileSize,
     };
+    // 새 촬영 → 새 보관함 id(이 촬영의 재분석은 같은 id로 덮어써 중복 방지).
+    archiveIdRef.current = `receipt-${Date.now()}`;
     setImageUri(asset.uri);
     setOcrImageUri(prepared.uri);
     setAssetInfo(info);
@@ -3260,6 +3437,16 @@ function OcrScannerModal({
       setFields(next.fields);
       setStageAnimated('review');
       verifyForReview(next.fields);
+      // 촬영본을 주별 보관함에 저장(원본 이미지 기준). 등록 여부와 무관하게
+      // 한 번 찍은 인수증은 사용자가 삭제하기 전까지 보관한다. 실패해도 검토
+      // 흐름을 막지 않도록 fire-and-forget.
+      if (imageUri && archiveIdRef.current) {
+        archiveScannedReceipt({
+          id: archiveIdRef.current,
+          imageUri,
+          result: next,
+        }).catch(() => undefined);
+      }
     } catch (error) {
       const message =
         error instanceof OcrRecognizerUnavailableError || error instanceof OcrNoTextDetectedError
@@ -4116,6 +4303,20 @@ export default function RouteloApp() {
           settings={settings}
           onSettingsChange={setSettings}
           onEditAccount={() => setOnboardingVisible(true)}
+          onOpenArchive={() => {
+            animateLayout(MOTION.quickMs);
+            setActiveTab('archive');
+          }}
+        />
+      );
+    }
+    if (activeTab === 'archive') {
+      return (
+        <ReceiptArchiveScreen
+          onBack={() => {
+            animateLayout(MOTION.quickMs);
+            setActiveTab('settings');
+          }}
         />
       );
     }
@@ -4182,7 +4383,10 @@ export default function RouteloApp() {
           ]}
         >
           {tabs.map((tab, index) => {
-            const selected = tab.key === activeTab;
+            // 보관함 화면은 설정에서 진입하므로 설정 탭을 활성으로 표시한다.
+            const selected =
+              tab.key === activeTab ||
+              (tab.key === 'settings' && activeTab === 'archive');
             return (
               <Pressable
                 key={tab.key}
@@ -4626,6 +4830,71 @@ const makeStyles = (C: Palette) =>
     marginRight: 10,
     backgroundColor: C.surface,
   },
+  archiveHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  archiveSubtitle: {
+    color: C.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  archiveWeekBlock: { marginTop: 4 },
+  archiveGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  archiveCard: {
+    width: '47%',
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.outline,
+    padding: 10,
+  },
+  archiveThumb: {
+    width: '100%',
+    height: 150,
+    borderRadius: 10,
+    backgroundColor: C.surfaceAlt,
+  },
+  archiveThumbEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  archiveMissingText: { color: C.textMuted, fontSize: 11 },
+  archiveCardCaption: {
+    color: C.text,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 8,
+    minHeight: 34,
+  },
+  archiveDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingVertical: 7,
+    borderRadius: 9,
+    backgroundColor: C.dangerBg,
+  },
+  archiveDeleteText: { color: C.danger, fontSize: 12, fontWeight: '700' },
+  archivePreviewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  archivePreviewImage: { width: '100%', height: '100%' },
   calendarAgendaCardConflict: {
     borderColor: C.warning,
     backgroundColor: C.warningBg,
