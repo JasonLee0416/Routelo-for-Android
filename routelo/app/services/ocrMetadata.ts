@@ -75,11 +75,11 @@ export function enrichOcrPipelineResult(
   );
   const conflicts = detectConflicts(fields);
   const reasons = [
-    ...missingRequired.map((label) => `Required field missing: ${label}`),
-    ...(lowConfidence ? [`Low document confidence: ${result.documentConfidence}`] : []),
+    ...missingRequired.map((label) => `필수 항목 누락: ${label}`),
+    ...(lowConfidence ? [`문서 신뢰도 낮음: ${result.documentConfidence}%`] : []),
     ...warningFields
       .filter((field) => field.required)
-      .map((field) => `Required field needs review: ${field.label}`),
+      .map((field) => `필수 항목 확인 필요: ${field.label}`),
     ...conflicts.map((conflict) => conflict.message),
   ];
 

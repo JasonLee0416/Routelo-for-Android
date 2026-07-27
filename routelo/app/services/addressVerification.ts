@@ -78,7 +78,7 @@ export function createOfflineAddressCandidates(
       status: 'missing',
       inputAddress: '',
       candidates: [],
-      warnings: ['Address is missing.'],
+      warnings: ['주소가 없습니다.'],
     };
   }
 
@@ -87,16 +87,16 @@ export function createOfflineAddressCandidates(
       status: 'needsReview',
       inputAddress: address,
       candidates: [],
-      warnings: ['Address contains label or phone-like text and must be reviewed manually.'],
+      warnings: ['주소에 라벨·전화번호가 섞여 있어 직접 확인이 필요합니다.'],
     };
   }
 
   if (!hasEnoughAddressEvidence(address)) {
-    warnings.push('Address lacks enough Korean region/road/building evidence.');
+    warnings.push('주소의 지역·도로·건물 정보가 부족합니다.');
   }
 
   const district = findDistrictByAddress(address, settings);
-  if (!district) warnings.push('No configured Seoul/Gyeonggi district matched this address.');
+  if (!district) warnings.push('등록된 배송 지역과 매칭되지 않았습니다.');
 
   const firstCoordinate = deterministicCoordinate(address, 0);
   const candidates: AddressCandidate[] = [
