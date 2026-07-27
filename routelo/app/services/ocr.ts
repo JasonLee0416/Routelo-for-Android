@@ -7,6 +7,7 @@ import {
 import { fixConfusableDigits } from '../ocr/confusables';
 import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
 import { applyOfficialOcrFieldGuardrails } from '../ocr/fieldValidation';
+import { estimateSkewDegrees } from '../ocr/deskew';
 import { buildLayoutText } from '../ocr/layout';
 import { normalizeReceipt } from '../ocr/normalize';
 import { enrichOcrPipelineResult } from './ocrMetadata';
@@ -41,6 +42,13 @@ type RecognizedText = {
 };
 
 type RecognizeImage = (imageUri: string) => Promise<RecognizedText>;
+
+// deskew 2-pass에서 원본 이미지를 각도만큼 회전한 새 이미지를 만든다. 런타임
+// 기본 구현은 expo-image-manipulator를 지연 로드하며, 테스트에서는 주입한다.
+type RotateImage = (
+  imageUri: string,
+  degrees: number,
+) => Promise<{ uri: string; width?: number; height?: number }>;
 
 export class OcrRecognizerUnavailableError extends Error {
   constructor(
@@ -968,11 +976,53 @@ export function parseReceiptText(
   });
 }
 
+// 인식 결과(recognized) 하나를 레이아웃 텍스트 → 필드 파싱 → 공간 휴리스틱까지
+// 돌려 파이프라인 결과를 만든다. deskew 2-pass에서 원본/회전본에 각각 적용해
+// 비교하기 위해 순수 빌드 단계로 분리했다(assert/enrich는 최종 선택본에만).
+function buildOcrResultFromRecognition(
+  recognized: RecognizedText,
+  asset: ImageAssetInfo,
+  quality: CaptureQuality,
+): { parsed: OcrPipelineResult; textForParsing: string } {
+  const layoutText = buildLayoutText(recognized.lines || [], recognized.fullText);
+  const textForParsing =
+    receiptEvidenceScore(layoutText) >= receiptEvidenceScore(recognized.fullText)
+      ? layoutText
+      : recognized.fullText;
+  const parsed = applySpatialOcrFieldHeuristics(
+    parseReceiptText(textForParsing, quality),
+    recognized.lines || [],
+    { width: asset.width, height: asset.height },
+  );
+  return { parsed, textForParsing };
+}
+
+// deskew 후보 우열 판정용 점수. 채워진 필드 수·필수 필드 충족·문서 신뢰도를
+// 합산한다. 회전본이 이 점수를 "실질적으로" 높일 때만 채택하므로, 각도/부호가
+// 틀리면 원본이 유지된다(회귀 방지).
+function scoreDeskewCandidate(parsed: OcrPipelineResult): number {
+  const filled = parsed.fields.filter((field) => field.value.trim()).length;
+  const requiredFilled = parsed.fields.filter(
+    (field) => field.required && field.value.trim(),
+  ).length;
+  return filled * 4 + requiredFilled * 6 + parsed.documentConfidence * 0.5;
+}
+
+const defaultRotateImage: RotateImage = async (imageUri, degrees) => {
+  const { manipulateAsync, SaveFormat } = await import('expo-image-manipulator');
+  const result = await manipulateAsync(imageUri, [{ rotate: degrees }], {
+    compress: 1,
+    format: SaveFormat.JPEG,
+  });
+  return { uri: result.uri, width: result.width, height: result.height };
+};
+
 export async function runReceiptOcr(
   asset: ImageAssetInfo,
   rawText?: string,
   recognizeImage?: RecognizeImage,
   qualityOverride?: CaptureQuality,
+  rotateImage?: RotateImage,
 ): Promise<OcrPipelineResult> {
   const quality = qualityOverride || inspectCaptureQuality(asset);
   if (rawText?.trim()) {
@@ -1006,36 +1056,62 @@ export async function runReceiptOcr(
           .join(' '),
       );
     }
-    const layoutText = buildLayoutText(
-      recognized.lines || [],
-      recognized.fullText,
-    );
-    const textForParsing =
-      receiptEvidenceScore(layoutText) >= receiptEvidenceScore(recognized.fullText)
-        ? layoutText
-        : recognized.fullText;
-    const parsed = applySpatialOcrFieldHeuristics(
-      parseReceiptText(textForParsing, quality),
-      recognized.lines || [],
-      {
-        width: asset.width,
-        height: asset.height,
-      },
-    );
-    assertUsefulOcrEvidence(textForParsing, parsed);
+
+    let chosenRecognized: RecognizedText = recognized;
+    let chosen = buildOcrResultFromRecognition(recognized, asset, quality);
+    let variantsCompared = 1;
+
+    // deskew 2-pass: 라인 박스로 문서 기울기를 추정해 confident할 때만 원본을
+    // -degrees 회전해 재인식한다. 회전본이 인식 품질을 실질적으로 높일 때만 채택
+    // (부호/각도 오류 시 원본 폴백). 회전·재인식 실패는 조용히 1차를 유지한다.
+    const skew = estimateSkewDegrees(recognized.lines || []);
+    if (skew.confident) {
+      try {
+        const rotate = rotateImage || defaultRotateImage;
+        const rotated = await rotate(asset.uri, -skew.degrees);
+        const rotatedRecognized = await recognize(rotated.uri);
+        if (rotatedRecognized.fullText.trim()) {
+          variantsCompared = 2;
+          const rotatedAsset: ImageAssetInfo = {
+            ...asset,
+            uri: rotated.uri,
+            width: rotated.width ?? asset.width,
+            height: rotated.height ?? asset.height,
+          };
+          const rotatedBuild = buildOcrResultFromRecognition(
+            rotatedRecognized,
+            rotatedAsset,
+            quality,
+          );
+          if (
+            scoreDeskewCandidate(rotatedBuild.parsed) >
+            scoreDeskewCandidate(chosen.parsed)
+          ) {
+            chosen = rotatedBuild;
+            chosenRecognized = rotatedRecognized;
+          }
+        }
+      } catch {
+        // 회전/재인식 실패 시 1차 결과를 그대로 사용한다.
+      }
+    }
+
+    assertUsefulOcrEvidence(chosen.textForParsing, chosen.parsed);
     return enrichOcrPipelineResult({
-      ...parsed,
-      engine: recognized.engine || 'ppocrv5',
-      modelVersion: recognized.modelVersion,
-      recognizedLines: recognized.lines,
-      processingMs: recognized.processingMs,
-      variantsCompared:
-        'variantsCompared' in recognized
-          ? recognized.variantsCompared ?? parsed.variantsCompared
-          : parsed.variantsCompared,
+      ...chosen.parsed,
+      engine: chosenRecognized.engine || 'ppocrv5',
+      modelVersion: chosenRecognized.modelVersion,
+      recognizedLines: chosenRecognized.lines,
+      processingMs: chosenRecognized.processingMs,
+      variantsCompared: Math.max(
+        variantsCompared,
+        'variantsCompared' in chosenRecognized
+          ? chosenRecognized.variantsCompared ?? 1
+          : 1,
+      ),
       ocrDiagnostics: {
-        ...recognized.diagnostics,
-        rawTextLength: textForParsing.length,
+        ...chosenRecognized.diagnostics,
+        rawTextLength: chosen.textForParsing.length,
       },
     });
   } catch (error) {
