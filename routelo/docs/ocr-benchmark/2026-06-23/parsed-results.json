@@ -21,7 +21,7 @@
     "antiFabricationPassCount": 8,
     "demoLeakCount": 0,
     "unsupportedFieldCount": 0,
-    "falseDataRiskCount": 0,
+    "falseDataRiskCount": 1,
     "reviewRiskCount": 0
   },
   "results": [
@@ -40,7 +40,7 @@
       },
       "parser": {
         "documentConfidence": 27,
-        "populatedFieldCount": 3,
+        "populatedFieldCount": 5,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
@@ -49,11 +49,11 @@
         "fields": [
           {
             "key": "orderingVendorName",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "주문자",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "주문자",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -103,11 +103,11 @@
           },
           {
             "key": "ribbonText",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "보내는분",
+            "confidence": 76,
+            "status": "review",
+            "sourceText": "보내는분",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -222,12 +222,12 @@
       },
       "parser": {
         "documentConfidence": 27,
-        "populatedFieldCount": 4,
+        "populatedFieldCount": 6,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
         "rawFallbackFieldCount": 0,
-        "unmappedLineCount": 22,
+        "unmappedLineCount": 23,
         "fields": [
           {
             "key": "orderingVendorName",
@@ -267,20 +267,20 @@
           },
           {
             "key": "productName",
-            "value": "명",
+            "value": "[축하화환 FA248] 축하화환 3단",
             "confidence": 82,
-            "status": "warning",
-            "sourceText": "상품명",
+            "status": "review",
+            "sourceText": "[축하화환 FA248] 축하화환 3단",
             "provenance": "sourceText",
             "semanticRisks": []
           },
           {
             "key": "productQuantity",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "3",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "[축하화환 FA248] 축하화환 3단",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -357,11 +357,11 @@
           },
           {
             "key": "recipientName",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "신랑 최성인",
+            "confidence": 82,
+            "status": "review",
+            "sourceText": "받는분: 신랑 최성인",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -449,10 +449,10 @@
           },
           {
             "key": "productName",
-            "value": "명",
+            "value": "배달일시",
             "confidence": 82,
             "status": "warning",
-            "sourceText": "상품명",
+            "sourceText": "배달일시",
             "provenance": "sourceText",
             "semanticRisks": []
           },
@@ -586,9 +586,9 @@
       },
       "parser": {
         "documentConfidence": 86,
-        "populatedFieldCount": 5,
+        "populatedFieldCount": 6,
         "unsupportedFieldCount": 0,
-        "falseDataRiskCount": 0,
+        "falseDataRiskCount": 1,
         "reviewRiskCount": 0,
         "rawFallbackFieldCount": 0,
         "unmappedLineCount": 23,
@@ -631,10 +631,10 @@
           },
           {
             "key": "productName",
-            "value": "명",
+            "value": "근조3단",
             "confidence": 82,
-            "status": "warning",
-            "sourceText": "상품명",
+            "status": "review",
+            "sourceText": "근조3단 -",
             "provenance": "sourceText",
             "semanticRisks": []
           },
@@ -739,12 +739,17 @@
           },
           {
             "key": "memo",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
-            "semanticRisks": []
+            "value": "경기 용인시-경기용인45호(용인세브란스화원)-010-3348",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "경기 용인시-경기용인45호(용인세브란스화원)-010-3348",
+            "provenance": "sourceText",
+            "semanticRisks": [
+              {
+                "severity": "false-data",
+                "reason": "vendor/contact line was assigned as memo"
+              }
+            ]
           }
         ]
       },
@@ -768,7 +773,7 @@
       },
       "parser": {
         "documentConfidence": 58,
-        "populatedFieldCount": 3,
+        "populatedFieldCount": 4,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
@@ -797,8 +802,8 @@
             "key": "fulfillingVendorName",
             "value": "",
             "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
+            "status": "warning",
+            "sourceText": "상품코드",
             "provenance": "missing",
             "semanticRisks": []
           },
@@ -813,29 +818,29 @@
           },
           {
             "key": "productName",
-            "value": "코드",
+            "value": "|근조화환 1개 (새꽃정 풀화환 )",
             "confidence": 82,
-            "status": "warning",
-            "sourceText": "상품코드",
+            "status": "review",
+            "sourceText": "|근조화환 1개 (새꽃정 풀화환 )",
             "provenance": "sourceText",
             "semanticRisks": []
           },
           {
             "key": "productQuantity",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "1",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "|근조화환 1개 (새꽃정 풀화환 )",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
             "key": "ribbonText",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "배송일시",
+            "confidence": 76,
+            "status": "review",
+            "sourceText": "배송일시",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -903,11 +908,11 @@
           },
           {
             "key": "recipientName",
-            "value": "명",
-            "confidence": 82,
-            "status": "review",
-            "sourceText": "인수자명",
-            "provenance": "sourceText",
+            "value": "",
+            "confidence": 0,
+            "status": "missing",
+            "sourceText": "",
+            "provenance": "missing",
             "semanticRisks": []
           },
           {
@@ -949,8 +954,8 @@
         "nonEmpty": true
       },
       "parser": {
-        "documentConfidence": 0,
-        "populatedFieldCount": 0,
+        "documentConfidence": 27,
+        "populatedFieldCount": 4,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
@@ -959,11 +964,11 @@
         "fields": [
           {
             "key": "orderingVendorName",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "주문자",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "주문자",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -995,11 +1000,11 @@
           },
           {
             "key": "productName",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "배달일시",
+            "confidence": 82,
+            "status": "warning",
+            "sourceText": "배달일시",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -1007,17 +1012,17 @@
             "value": "",
             "confidence": 0,
             "status": "missing",
-            "sourceText": "",
+            "sourceText": "HP",
             "provenance": "missing",
             "semanticRisks": []
           },
           {
             "key": "ribbonText",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "보내는분",
+            "confidence": 76,
+            "status": "review",
+            "sourceText": "보내는분",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -1085,11 +1090,11 @@
           },
           {
             "key": "recipientName",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "고인 구본순",
+            "confidence": 82,
+            "status": "review",
+            "sourceText": "고인 구본순",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -1132,7 +1137,7 @@
       },
       "parser": {
         "documentConfidence": 27,
-        "populatedFieldCount": 4,
+        "populatedFieldCount": 5,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
@@ -1141,11 +1146,11 @@
         "fields": [
           {
             "key": "orderingVendorName",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "주문자",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "주문자",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -1314,7 +1319,7 @@
       },
       "parser": {
         "documentConfidence": 55,
-        "populatedFieldCount": 4,
+        "populatedFieldCount": 7,
         "unsupportedFieldCount": 0,
         "falseDataRiskCount": 0,
         "reviewRiskCount": 0,
@@ -1323,11 +1328,11 @@
         "fields": [
           {
             "key": "orderingVendorName",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "송화원",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "송화원",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -1359,29 +1364,29 @@
           },
           {
             "key": "productName",
-            "value": "영",
+            "value": "[근조화환 FB268] 근조 3단",
             "confidence": 82,
-            "status": "warning",
-            "sourceText": "상품영",
+            "status": "review",
+            "sourceText": "[근조화환 FB268] 근조 3단",
             "provenance": "sourceText",
             "semanticRisks": []
           },
           {
             "key": "productQuantity",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "3",
+            "confidence": 78,
+            "status": "review",
+            "sourceText": "[근조화환 FB268] 근조 3단",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
             "key": "ribbonText",
-            "value": "",
-            "confidence": 0,
-            "status": "missing",
-            "sourceText": "",
-            "provenance": "missing",
+            "value": "주문자",
+            "confidence": 76,
+            "status": "review",
+            "sourceText": "주문자",
+            "provenance": "sourceText",
             "semanticRisks": []
           },
           {
@@ -1452,7 +1457,7 @@
             "value": "",
             "confidence": 0,
             "status": "missing",
-            "sourceText": "",
+            "sourceText": "99플라워",
             "provenance": "missing",
             "semanticRisks": []
           },
