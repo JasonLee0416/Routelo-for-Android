@@ -350,4 +350,14 @@ describe('OCR single-image parsing quality (golden-observed)', () => {
       )?.value,
     ).toBe('행복플라워');
   });
+
+  it('한 줄에 병합된 라벨을 분리해 여러 필드를 복원한다(ML Kit 셀 병합 보완)', () => {
+    // ML Kit이 여러 셀을 한 줄로 뭉친 실제 케이스. 예전엔 배송지만 살아남았다.
+    const text =
+      '보내는 분 : (주)제이콘솔라인 대표이사 김장호 경조사어 : 삼가 고인의 명복을 빕니다 주소 서울 동작구 중앙대병원 장례식장 5호';
+    const result = parseReceiptText(text, quality);
+    // 배송지·리본이 같은 줄에서 함께 복원된다.
+    expect(field(result, 'deliveryAddress')?.value).toContain('중앙대병원 장례식장');
+    expect(field(result, 'ribbonText')?.value).toContain('삼가 고인의 명복을 빕니다');
+  });
 });

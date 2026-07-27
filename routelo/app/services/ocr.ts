@@ -353,6 +353,40 @@ function refineVendorSource<T extends { value: string } | undefined>(
   return { ...source, value: refineVendorCandidate(source.value) };
 }
 
+// ML Kit이 표의 여러 셀을 한 줄로 병합하면(예: "보내는 분 : … 경조사어 : … 주소
+// 서울 …") 라인 단위 파서가 필드를 못 나눈다. 한 줄에 임베디드된 라벨 앞에서
+// 잘라 세부 라인으로 분리한다. 고정밀 유지: (a) 콜론이 붙은 사전 라벨, (b) 콜론
+// 없이도 새 필드가 확실한 위치 라벨(주소/배달장소 등)만 경계로 삼고, 한글 단어
+// 중간(선행 글자가 한글)에서는 자르지 않는다(오분할 방지).
+const EMBEDDED_LABELS = [
+  ...new Set(
+    DEFAULT_FIELD_REGISTRY.flatMap((def) => [def.label, ...def.aliases]).concat([
+      '보내는분',
+      '보내는 분',
+      '주문자',
+    ]),
+  ),
+].filter((label) => label.length >= 2);
+
+const EMBEDDED_LABEL_CORE = EMBEDDED_LABELS.map((label) =>
+  escapeRegExp(label.trim()).replace(/\s+/g, '\\s*'),
+).join('|');
+const EMBEDDED_STRONG_NOCOLON = '주소|배달장소|배송장소|배송지';
+// 선행 문자가 한글이거나 여는 괄호면 자르지 않는다: "(HP:…)" 같은 괄호 안 부가
+// 라벨을 새 필드로 오분할하지 않기 위함(뒤에 매달린 "(" 잔여 방지).
+const EMBEDDED_LABEL_SPLIT = new RegExp(
+  `(?=(?<![가-힣(])(?:${EMBEDDED_LABEL_CORE})\\s*[:：])|(?=(?<![가-힣(])(?:${EMBEDDED_STRONG_NOCOLON})\\s)`,
+  'g',
+);
+
+function segmentByEmbeddedLabels(line: string): string[] {
+  const parts = line
+    .split(EMBEDDED_LABEL_SPLIT)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  return parts.length > 1 ? parts : [line];
+}
+
 function findLabeledValue(lines: string[], aliases: string[]) {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index].trim();
@@ -548,7 +582,9 @@ export function parseReceiptText(
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    // 한 줄에 여러 라벨이 병합된 경우 라벨 경계로 쪼갠다(ML Kit 셀 병합 보완).
+    .flatMap((line) => segmentByEmbeddedLabels(line));
   const { fields: mapped, unmapped } = normalizeReceipt(
     lines,
     DEFAULT_FIELD_REGISTRY,
