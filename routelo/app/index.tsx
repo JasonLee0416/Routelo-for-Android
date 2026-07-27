@@ -116,6 +116,17 @@ import {
   listArchivedReceiptWeeks,
   type ArchiveWeekGroup,
 } from './services/receiptArchive';
+import {
+  INQUIRY_ACCESS_KEY,
+  INQUIRY_IMAGE_MAX,
+  INQUIRY_IMAGE_MAX_BYTES,
+  INQUIRY_SUBJECT_MAX,
+  INQUIRY_CONTENT_MAX,
+  INQUIRY_TYPES,
+  buildInquiryMailtoUrl,
+  buildInquirySubject,
+  isInquiryComplete,
+} from './services/inquiry';
 import { buildDailyProfitCsv } from './services/export';
 import { createFuelLog } from './services/fuel';
 import { createMileageLog } from './services/mileage';
@@ -1893,14 +1904,6 @@ function ReceiptArchiveScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-// 관리자(개발자) 수신 주소 — UI에는 노출하지 않는다(유저에게 안 보임).
-const DEVELOPER_INQUIRY_EMAIL = 'sinsgerm@gmail.com';
-// Web3Forms 액세스 키(무료, sinsgerm@gmail.com에 연결). 값이 있으면 수신자 숨김·
-// 자동 전송·이미지 첨부가 활성화된다. 비어 있으면 기기 메일앱(mailto)으로 폴백.
-// 발급: https://web3forms.com (이메일 sinsgerm@gmail.com로 폼 생성 → access key).
-const INQUIRY_ACCESS_KEY = '';
-const INQUIRY_TYPES = ['버그·오류', '인식 오류', '기능 제안', '기타'];
-
 function ContactScreen({ onBack }: { onBack: () => void }) {
   const { C, styles } = useTheme();
   const [email, setEmail] = useState('');
@@ -1911,17 +1914,20 @@ function ContactScreen({ onBack }: { onBack: () => void }) {
   const [typeOpen, setTypeOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const canSubmit =
-    emailValid &&
-    !!type &&
-    subject.trim().length > 0 &&
-    content.trim().length >= 10 &&
-    !submitting;
+    isInquiryComplete({ email, type, subject, content }) && !submitting;
+
+  const resetForm = () => {
+    setEmail('');
+    setType('');
+    setSubject('');
+    setContent('');
+    setImages([]);
+  };
 
   const addImages = async () => {
-    if (images.length >= 5) {
-      Alert.alert('첨부 제한', '이미지는 최대 5장까지 첨부할 수 있습니다.');
+    if (images.length >= INQUIRY_IMAGE_MAX) {
+      Alert.alert('첨부 제한', `이미지는 최대 ${INQUIRY_IMAGE_MAX}장까지 첨부할 수 있습니다.`);
       return;
     }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1933,23 +1939,30 @@ function ContactScreen({ onBack }: { onBack: () => void }) {
       mediaTypes: ['images'],
       quality: 0.8,
       allowsMultipleSelection: true,
-      selectionLimit: 5 - images.length,
+      selectionLimit: INQUIRY_IMAGE_MAX - images.length,
     });
     if (picked.canceled) return;
-    const uris = picked.assets.map((a) => a.uri);
-    setImages((prev) => [...prev, ...uris].slice(0, 5));
+    // 5MB 초과분은 제외한다(UI 안내와 실제 동작을 일치).
+    const withinLimit = picked.assets.filter(
+      (a) => !a.fileSize || a.fileSize <= INQUIRY_IMAGE_MAX_BYTES,
+    );
+    const skipped = picked.assets.length - withinLimit.length;
+    if (skipped > 0) {
+      Alert.alert('용량 초과', `5MB를 넘는 이미지 ${skipped}장은 제외했습니다.`);
+    }
+    const uris = withinLimit.map((a) => a.uri);
+    setImages((prev) => [...prev, ...uris].slice(0, INQUIRY_IMAGE_MAX));
   };
 
   const submit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const title = `[ROUTELO 문의] ${type} · ${subject.trim()}`;
       if (INQUIRY_ACCESS_KEY) {
         // 수신자 숨김 + 자동 전송 + 이미지 첨부(Web3Forms가 개발자 메일로 라우팅).
         const form = new FormData();
         form.append('access_key', INQUIRY_ACCESS_KEY);
-        form.append('subject', title);
+        form.append('subject', buildInquirySubject(type, subject));
         form.append('from_name', email.trim());
         form.append('email', email.trim());
         form.append('문의유형', type);
@@ -1972,26 +1985,26 @@ function ContactScreen({ onBack }: { onBack: () => void }) {
         };
         if (!json.success) throw new Error(json.message || '전송에 실패했습니다.');
         Alert.alert('접수 완료', '문의가 전달되었습니다. 감사합니다.');
+        resetForm();
+        onBack();
       } else {
-        // 폴백: 기기 메일앱으로 개발자에게 전송(첨부는 메일앱에서 직접 추가).
-        const body =
-          `문의 유형: ${type}\n회신 이메일: ${email.trim()}\n\n${content.trim()}` +
-          (images.length
-            ? `\n\n(첨부 이미지 ${images.length}장은 메일 작성 화면에서 직접 추가해 주세요.)`
-            : '');
-        const url = `mailto:${DEVELOPER_INQUIRY_EMAIL}?subject=${encodeURIComponent(
-          title,
-        )}&body=${encodeURIComponent(body)}`;
+        // 폴백: 기기 메일앱으로 개발자에게 전송. 실제 전송은 메일앱에서 사용자가
+        // 완료하므로, 여기서 폼을 비우거나 뒤로 가지 않는다(취소 시 데이터 유실 방지).
+        const url = buildInquiryMailtoUrl({
+          email,
+          type,
+          subject,
+          content,
+          imageCount: images.length,
+        });
         const can = await Linking.canOpenURL(url);
         if (!can) throw new Error('메일 앱을 열 수 없습니다. 기기에 메일 앱을 설정해 주세요.');
         await Linking.openURL(url);
+        Alert.alert(
+          '메일 앱 열림',
+          '메일 작성 화면에서 전송을 완료해 주세요. 첨부 이미지가 있으면 메일 앱에서 직접 추가해야 합니다.',
+        );
       }
-      setEmail('');
-      setType('');
-      setSubject('');
-      setContent('');
-      setImages([]);
-      onBack();
     } catch (error) {
       Alert.alert(
         '전송 실패',
@@ -2065,19 +2078,19 @@ function ContactScreen({ onBack }: { onBack: () => void }) {
       {label('제목')}
       <TextInput
         value={subject}
-        onChangeText={(t) => setSubject(t.slice(0, 200))}
+        onChangeText={(t) => setSubject(t.slice(0, INQUIRY_SUBJECT_MAX))}
         placeholder="문의 제목을 입력해주세요"
         placeholderTextColor={C.textMuted}
         style={field}
       />
       <Text style={{ color: C.textMuted, fontSize: 12, marginTop: 6, marginBottom: 18, textAlign: 'right' }}>
-        {subject.length}/200
+        {subject.length}/{INQUIRY_SUBJECT_MAX}
       </Text>
 
       {label('문의 내용')}
       <TextInput
         value={content}
-        onChangeText={(t) => setContent(t.slice(0, 5000))}
+        onChangeText={(t) => setContent(t.slice(0, INQUIRY_CONTENT_MAX))}
         placeholder="문의 내용을 자세히 작성해주세요. (최소 10자)"
         placeholderTextColor={C.textMuted}
         multiline
@@ -2085,7 +2098,7 @@ function ContactScreen({ onBack }: { onBack: () => void }) {
         style={[field, { minHeight: 150 }]}
       />
       <Text style={{ color: C.textMuted, fontSize: 12, marginTop: 6, marginBottom: 18, textAlign: 'right' }}>
-        {content.length}/5000
+        {content.length}/{INQUIRY_CONTENT_MAX}
       </Text>
 
       <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', marginBottom: 8 }}>
