@@ -63,6 +63,7 @@
     "test:ci": "jest --runInBand",
     "verify:ocr-models": "node scripts/verify-ocr-models.mjs",
     "verify:no-mlkit": "node scripts/verify-no-mlkit.mjs",
+    "venue:provenance": "node scripts/venue-provenance-report.mjs",
     "typecheck": "tsc --noEmit",
     "doctor": "npx --yes expo-doctor",
     "build:web": "expo export --platform web",

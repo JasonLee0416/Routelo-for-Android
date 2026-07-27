@@ -4,12 +4,24 @@
 
 export type VenueType = 'funeral' | 'wedding';
 
+// 레코드 출처(provenance). 법적 리스크 관리를 위해 각 항목이 어디서 왔는지
+// 추적한다(#149). 'localdata'/'public-mohw'/'self-collected'는 배포 안전,
+// 'map-suspect'는 지도서비스 유래 의심(재수집 대상), 'unverified'는 출처 미확인.
+export type VenueSource =
+  | 'localdata'
+  | 'public-mohw'
+  | 'self-collected'
+  | 'map-suspect'
+  | 'unverified';
+
 export type VenueEntry = {
   name: string;
   aliases?: string[];
   district?: string;
   address?: string;
   type?: VenueType;
+  // 출처 미기록 레코드는 'unverified'로 간주한다(런타임 매칭엔 영향 없음).
+  source?: VenueSource;
 };
 
 export type VenueMatch = {
