@@ -44,10 +44,10 @@ export function suggestVenues(
 ): VenueMatch[] {
   const limit = options.limit ?? 3;
   const band = options.band ?? 0.1;
-  const run = (opts: MatchOptions) =>
-    matchVenue(query, entries, { ...opts, limit: (opts.limit ?? limit) + 4 });
-  let matches = run(options);
-  if (!matches.length && options.type) matches = run({ ...options, type: undefined });
+  // 종류 힌트가 있으면 그 종류로만 찾는다. 힌트가 있는데 같은 종류에 매칭이 없으면
+  // 교차 종류로 넓히지 않는다(장례 배송지에 웨딩홀이 뜨는 오탐 방지). 힌트가 없을
+  // 때(type undefined)만 전체를 검색.
+  const matches = matchVenue(query, entries, { ...options, limit: limit + 4 });
   if (!matches.length) return [];
   const top = matches[0].score;
   return matches.filter((m) => top - m.score <= band).slice(0, limit);

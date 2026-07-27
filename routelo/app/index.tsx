@@ -3066,10 +3066,16 @@ function OcrScannerModal({
   const deliveryAddressValue =
     fields.find((item) => item.key === 'deliveryAddress')?.value || '';
   // 수도권 장소 사전 후보(배송지/상호명). 매칭 없으면 빈 배열 → OCR 값 그대로.
-  // 비파괴: 후보를 탭했을 때만 값이 반영된다(자동확정 없음).
+  // 비파괴: 후보를 탭했을 때만 값이 반영된다(자동확정 없음). 배송지/상호명/상품명
+  // 값이 바뀔 때만 재계산(다른 필드 편집 키 입력마다 전체 사전 스캔하지 않도록).
+  const venueMatchDeps = fields
+    .filter((f) => ['deliveryAddress', 'venueName', 'productName'].includes(f.key))
+    .map((f) => `${f.key}=${f.value}`)
+    .join('||');
   const venueSuggestions = useMemo<VenueSuggestion[]>(
     () => suggestDeliveryVenues(fields),
-    [fields],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [venueMatchDeps],
   );
   const venueCandidatesFor = (key: string) =>
     venueSuggestions.find((s) => s.fieldKey === key)?.candidates ?? [];
@@ -3651,7 +3657,7 @@ function OcrScannerModal({
                       <Text style={styles.candidateLabel}>장소 후보</Text>
                       {venueCandidatesFor(field.key).map((candidate) => (
                         <Pressable
-                          key={candidate.entry.name}
+                          key={`${candidate.entry.name}|${candidate.entry.district || ''}`}
                           style={styles.venueCandidateChip}
                           onPress={() =>
                             updateField(field.key, candidate.entry.name)
@@ -3664,6 +3670,9 @@ function OcrScannerModal({
                           />
                           <Text style={styles.venueCandidateChipText}>
                             {candidate.entry.name}
+                            {candidate.entry.district
+                              ? ` · ${candidate.entry.district}`
+                              : ''}
                           </Text>
                         </Pressable>
                       ))}

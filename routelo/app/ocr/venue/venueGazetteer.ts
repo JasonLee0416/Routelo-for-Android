@@ -20,12 +20,20 @@ export type VenueMatch = {
 
 // 매칭 정규화는 공백·구두점·괄호 제거만(대소문자 통일 포함). 일반 홀명·종류어를
 // 걷어내는 적극 정규화는 실제 장소명을 훼손해 누락을 유발할 수 있어 하지 않는다.
+// 사전 표면형(768곳 × 별칭)이 매 호출마다 재정규화되지 않도록 결과를 캐시한다
+// (키 입력마다 matchVenue가 전체 사전을 스캔해도 정규화는 최초 1회만).
+const normalizeCache = new Map<string, string>();
 export function normalizeVenue(raw: string): string {
-  return (raw || '')
+  const key = raw || '';
+  const cached = normalizeCache.get(key);
+  if (cached !== undefined) return cached;
+  const out = key
     .normalize('NFKC')
     .trim()
     .toLowerCase()
     .replace(/[\s·・.,/\\|()[\]{}<>~\-–—:：'"]+/g, '');
+  normalizeCache.set(key, out);
+  return out;
 }
 
 // 최장 공통 부분문자열 길이(연속).
@@ -49,8 +57,9 @@ export function longestCommonSubstring(a: string, b: string): number {
   return best;
 }
 
-// 두 정규화 문자열의 유사도(0~1). 1~2글자 우연 일치는 최소 LCS 가드로 배제.
-export function venueSimilarity(a: string, b: string, minLcs = 3): number {
+// 두 정규화 문자열의 유사도(0~1). 짧은/일반 표면형의 우연 일치는 최소 LCS(기본 4)
+// 가드로 배제한다(예: "화빌딩" 3글자 겹침으로 문화웨딩홀이 뜨는 오탐 방지).
+export function venueSimilarity(a: string, b: string, minLcs = 4): number {
   if (!a || !b) return 0;
   if (a === b) return 1;
   // a=OCR 텍스트, b=사전 표면형으로 가정한 비대칭 포함 관계.
@@ -81,7 +90,7 @@ export function matchVenue(
 ): VenueMatch[] {
   const threshold = options.threshold ?? 0.6;
   const limit = options.limit ?? 5;
-  const minLcs = options.minLcs ?? 3;
+  const minLcs = options.minLcs ?? 4;
   const normOcr = normalizeVenue(ocrText);
   if (normOcr.length < minLcs) return [];
 
