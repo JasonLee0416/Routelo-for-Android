@@ -1745,6 +1745,8 @@ function ReceiptArchiveScreen({ onBack }: { onBack: () => void }) {
   const [loaded, setLoaded] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
+  // 파일이 사라진(백업 복원 등) 레코드의 썸네일 로드 실패를 추적해 대체 표시.
+  const [brokenIds, setBrokenIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let active = true;
@@ -1821,6 +1823,7 @@ function ReceiptArchiveScreen({ onBack }: { onBack: () => void }) {
             <View style={styles.archiveGrid}>
               {week.receipts.map((receipt) => {
                 const uri = receiptPhotoUri(receipt.imagePath);
+                const showImage = Boolean(uri) && !brokenIds[receipt.id];
                 const caption =
                   receipt.summary?.deliveryAddress ||
                   receipt.summary?.productName ||
@@ -1829,14 +1832,21 @@ function ReceiptArchiveScreen({ onBack }: { onBack: () => void }) {
                 return (
                   <View key={receipt.id} style={styles.archiveCard}>
                     <Pressable
-                      onPress={() => uri && setPreview(uri)}
+                      onPress={() => showImage && uri && setPreview(uri)}
                       accessibilityLabel="인수증 크게 보기"
                     >
-                      {uri ? (
-                        <Image source={{ uri }} style={styles.archiveThumb} />
+                      {showImage && uri ? (
+                        <Image
+                          source={{ uri }}
+                          style={styles.archiveThumb}
+                          onError={() =>
+                            setBrokenIds((prev) => ({ ...prev, [receipt.id]: true }))
+                          }
+                        />
                       ) : (
                         <View style={[styles.archiveThumb, styles.archiveThumbEmpty]}>
                           <Ionicons name="image-outline" size={22} color={C.textMuted} />
+                          <Text style={styles.archiveMissingText}>이미지 없음</Text>
                         </View>
                       )}
                     </Pressable>
@@ -4373,7 +4383,10 @@ export default function RouteloApp() {
           ]}
         >
           {tabs.map((tab, index) => {
-            const selected = tab.key === activeTab;
+            // 보관함 화면은 설정에서 진입하므로 설정 탭을 활성으로 표시한다.
+            const selected =
+              tab.key === activeTab ||
+              (tab.key === 'settings' && activeTab === 'archive');
             return (
               <Pressable
                 key={tab.key}
@@ -4853,7 +4866,9 @@ const makeStyles = (C: Palette) =>
   archiveThumbEmpty: {
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
+  archiveMissingText: { color: C.textMuted, fontSize: 11 },
   archiveCardCaption: {
     color: C.text,
     fontSize: 12,

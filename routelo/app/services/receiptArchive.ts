@@ -85,7 +85,14 @@ export async function archiveScannedReceipt(
     summary: input.result ? summarize(input.result) : undefined,
     linkedDeliveryId: input.linkedDeliveryId,
   };
-  await deps.save(record);
+  try {
+    await deps.save(record);
+  } catch (error) {
+    // 레코드 저장 실패 시 방금 복사한 고아 이미지를 정리한다(디스크 누수 방지).
+    const uri = deps.resolveUri(imagePath);
+    if (uri) await deps.deleteFile(uri).catch(() => undefined);
+    throw error;
+  }
   return record;
 }
 

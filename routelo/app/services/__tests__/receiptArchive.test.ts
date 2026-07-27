@@ -101,6 +101,20 @@ describe('receipt archive service', () => {
     expect(store[0].summary?.productName).toBe('근조화환');
   });
 
+  it('레코드 저장이 실패하면 방금 복사한 고아 이미지를 정리하고 던진다', async () => {
+    const { deps, store, deletedFiles } = makeFakeDeps(
+      () => '2026-06-10T09:00:00.000Z',
+    );
+    deps.save = async () => {
+      throw new Error('storage full');
+    };
+    await expect(
+      archiveScannedReceipt({ id: 'r', imageUri: 'file:///a.jpg' }, deps),
+    ).rejects.toThrow('storage full');
+    expect(store).toHaveLength(0);
+    expect(deletedFiles).toEqual(['file:///doc/receipt-photos/r-archive.jpg']);
+  });
+
   it('삭제 시 레코드와 원본 이미지 파일을 함께 제거한다', async () => {
     const { deps, store, deletedFiles } = makeFakeDeps(
       () => '2026-06-10T09:00:00.000Z',
