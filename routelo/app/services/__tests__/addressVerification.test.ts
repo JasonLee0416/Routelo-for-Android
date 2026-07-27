@@ -56,7 +56,7 @@ describe('address verification candidates', () => {
 
     expect(result.status).toBe('needsReview');
     expect(result.candidates).toEqual([]);
-    expect(result.warnings[0]).toContain('label');
+    expect(result.warnings[0]).toContain('직접 확인');
   });
 
   it('selects a candidate and applies coordinates to an order', () => {

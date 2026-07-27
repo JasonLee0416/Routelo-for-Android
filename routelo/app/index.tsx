@@ -3016,9 +3016,7 @@ function AddressVerificationPanel({
                   {candidate.displayAddress}
                 </Text>
                 <Text style={styles.addressCandidateMeta}>
-                  {candidate.provider} · {candidate.confidence}% ·{' '}
-                  {candidate.district || '구/시 미확인'} ·{' '}
-                  {candidate.latitude.toFixed(5)}, {candidate.longitude.toFixed(5)}
+                  {candidate.district || '지역 미확인'} · 정확도 {candidate.confidence}%
                 </Text>
               </View>
             </Pressable>
@@ -3451,7 +3449,9 @@ function OcrScannerModal({
                 <Text style={styles.qualityScoreLabel}>품질</Text>
               </View>
             </View>
-            <OcrRuntimeInputCard evidence={ocrInputEvidence} />
+            {OCR_RUNTIME_CONFIG.diagnostics ? (
+              <OcrRuntimeInputCard evidence={ocrInputEvidence} />
+            ) : null}
             <View style={styles.qualityCard}>
               <View style={styles.qualityCardHeader}>
                 <View>
@@ -3482,7 +3482,7 @@ function OcrScannerModal({
                   </Text>
                 </View>
               )}
-              {quality.metrics ? (
+              {OCR_RUNTIME_CONFIG.diagnostics && quality.metrics ? (
                 <Text style={styles.qualityMetricText}>
                   sharp={quality.metrics.sharpnessVariance ?? '-'} · lum={quality.metrics.luminanceMean ?? '-'} · paper={quality.metrics.paperPixelRatio ?? '-'} · box={quality.metrics.documentBoxRatio ?? '-'} · shadow={quality.metrics.shadowTileStd ?? '-'} · skew={quality.metrics.skewDegrees ?? '-'}
                 </Text>
@@ -3494,7 +3494,7 @@ function OcrScannerModal({
                 <Text style={styles.qualityWarningText}>{message}</Text>
               </View>
             ))}
-            {result?.ocrDiagnostics ? (
+            {OCR_RUNTIME_CONFIG.diagnostics && result?.ocrDiagnostics ? (
               <View style={styles.ocrDiagnosticCard}>
                 <Ionicons name="analytics-outline" size={19} color={C.primary} />
                 <View style={{ flex: 1 }}>
@@ -3505,7 +3505,9 @@ function OcrScannerModal({
                 </View>
               </View>
             ) : null}
-            <OcrDiagnosticComparisonCard report={diagnosticReport} />
+            {OCR_RUNTIME_CONFIG.diagnostics ? (
+              <OcrDiagnosticComparisonCard report={diagnosticReport} />
+            ) : null}
             <View style={styles.variantInfo}>
               <Ionicons name="layers-outline" size={20} color={C.primary} />
               <Text style={styles.variantInfoText}>
@@ -3558,25 +3560,29 @@ function OcrScannerModal({
                   <Text style={styles.ocrSummaryLabel}>문서 전체 신뢰도</Text>
                   <Text style={styles.ocrSummaryValue}>{result.documentConfidence}%</Text>
                 </View>
-                <View style={styles.ocrSummaryMeta}>
-                  <Text style={styles.ocrSummaryMetaText}>
-                    {result.engine === 'ppocrv5'
-                      ? `PP-OCRv5 온디바이스 OCR${result.modelVersion ? ` · ${result.modelVersion}` : ''}`
-                      : result.engine === 'mlkit-v2-korean'
-                        ? `Android Korean Text OCR${result.modelVersion ? ` · ${result.modelVersion}` : ''}`
-                        : '명시적 테스트 샘플'}
-                  </Text>
-                  <Text style={styles.ocrSummaryMetaText}>
-                    단일 프레임 인식 · {result.processingMs}ms
-                  </Text>
-                  {result.ocrDiagnostics ? (
+                {OCR_RUNTIME_CONFIG.diagnostics ? (
+                  <View style={styles.ocrSummaryMeta}>
                     <Text style={styles.ocrSummaryMetaText}>
-                      regions {result.ocrDiagnostics.regionCount ?? 0} · lines {result.ocrDiagnostics.acceptedLineCount ?? 0} · text {result.ocrDiagnostics.rawTextLength ?? 0}
+                      {result.engine === 'ppocrv5'
+                        ? `PP-OCRv5 온디바이스 OCR${result.modelVersion ? ` · ${result.modelVersion}` : ''}`
+                        : result.engine === 'mlkit-v2-korean'
+                          ? `Android Korean Text OCR${result.modelVersion ? ` · ${result.modelVersion}` : ''}`
+                          : '명시적 테스트 샘플'}
                     </Text>
-                  ) : null}
-                </View>
+                    <Text style={styles.ocrSummaryMetaText}>
+                      단일 프레임 인식 · {result.processingMs}ms
+                    </Text>
+                    {result.ocrDiagnostics ? (
+                      <Text style={styles.ocrSummaryMetaText}>
+                        regions {result.ocrDiagnostics.regionCount ?? 0} · lines {result.ocrDiagnostics.acceptedLineCount ?? 0} · text {result.ocrDiagnostics.rawTextLength ?? 0}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
-              <OcrRuntimeInputCard evidence={ocrInputEvidence} />
+              {OCR_RUNTIME_CONFIG.diagnostics ? (
+                <OcrRuntimeInputCard evidence={ocrInputEvidence} />
+              ) : null}
               {result.cloudFallback?.trigger && (
                 <View style={styles.reviewGuide}>
                   <Ionicons name="cloud-upload-outline" size={19} color={C.warning} />
@@ -3593,7 +3599,9 @@ function OcrScannerModal({
                   </Text>
                 </View>
               )}
-              <OcrDiagnosticComparisonCard report={diagnosticReport} />
+              {OCR_RUNTIME_CONFIG.diagnostics ? (
+                <OcrDiagnosticComparisonCard report={diagnosticReport} />
+              ) : null}
               <View style={styles.reviewGuide}>
                 <Ionicons name="information-circle-outline" size={19} color={C.primary} />
                 <Text style={styles.reviewGuideText}>
