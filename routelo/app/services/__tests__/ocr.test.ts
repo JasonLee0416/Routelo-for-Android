@@ -178,6 +178,146 @@ describe('OCR zero-fabrication guard', () => {
       result.fields.find(({ key }) => key === 'recipientTel')?.value,
     ).toBe('010-4821-7732');
   });
+
+  // deskew 2-pass: 라인 박스 기울기가 confident할 때만 회전 후 재인식하고, 인식
+  // 품질이 실제로 나아질 때만 회전본을 채택한다(부호/각도 오류·실패 시 원본 유지).
+  // 라벨 행(단일 박스, 파싱 대상)과 다중 컬럼 노이즈 행(기울기 신호용, 별도 행이라
+  // 값 오염 없음)을 alphaDeg로 함께 기울여 만든다. 투영 프로파일이 기울기를
+  // 감지하려면 한 행에 여러 점이 있어야 해서 노이즈 행을 둔다.
+  const tiltedBox = (cx: number, cy: number, alphaDeg: number) => {
+    const rad = (alphaDeg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return {
+      x: cx * cos - cy * sin - 60,
+      y: cx * sin + cy * cos - 12,
+      width: 120,
+      height: 24,
+    };
+  };
+  const tiltedReceipt = (alphaDeg: number, labelTexts: string[]) => {
+    const lines = labelTexts.map((text, index) => ({
+      text,
+      boundingBox: tiltedBox(300, 200 + index * 46, alphaDeg),
+    }));
+    // 노이즈 행 4개 × 3열: 같은 cy에 여러 점을 만들어 기울기 감지 신호를 준다.
+    for (let row = 0; row < 4; row += 1) {
+      const cy = 500 + row * 46;
+      for (const cx of [150, 300, 450]) {
+        lines.push({ text: '표', boundingBox: tiltedBox(cx, cy, alphaDeg) });
+      }
+    }
+    return lines;
+  };
+
+  it('deskew: 기울기 신호가 약하면 1-pass로 끝나고 회전을 시도하지 않는다', async () => {
+    let recognizeCalls = 0;
+    let rotateCalls = 0;
+    const recognize = async () => {
+      recognizeCalls += 1;
+      return {
+        fullText:
+          '상품명: 근조화환 3단\n배송주소: 서울 강남구 테헤란로 1\n수령인 전화: 010-1234-5678',
+        processingMs: 1,
+        lines: [],
+      };
+    };
+    const rotate = async (uri: string) => {
+      rotateCalls += 1;
+      return { uri: `${uri}#rot` };
+    };
+    const result = await runReceiptOcr(
+      { uri: 'file:///flat.jpg', width: 1200, height: 1600 },
+      undefined,
+      recognize,
+      quality,
+      rotate,
+    );
+    expect(recognizeCalls).toBe(1);
+    expect(rotateCalls).toBe(0);
+    expect(result.variantsCompared).toBe(1);
+    expect(result.fields.find(({ key }) => key === 'productName')?.value).toBe(
+      '근조화환 3단',
+    );
+  });
+
+  it('deskew: 회전본이 더 많은 필드를 주면 채택한다(recognize 2회, variants=2)', async () => {
+    let recognizeCalls = 0;
+    const firstTexts = [
+      '상품명: 근조화환 3단',
+      '배송주소: 서울 강남구 테헤란로 1',
+      '수령인 전화: 010-1234-5678',
+      '잡음3',
+      '잡음4',
+      '잡음5',
+      '잡음6',
+    ];
+    const rotatedTexts = [
+      '상품명: 근조화환 3단',
+      '배송주소: 서울 강남구 테헤란로 1',
+      '수령인 전화: 010-1234-5678',
+      '리본문구: 삼가 고인의 명복을 빕니다',
+      '잡음4',
+      '잡음5',
+      '잡음6',
+    ];
+    const recognize = async (uri: string) => {
+      recognizeCalls += 1;
+      const rotated = uri.includes('#rot');
+      const texts = rotated ? rotatedTexts : firstTexts;
+      return {
+        fullText: texts.join('\n'),
+        processingMs: 1,
+        lines: tiltedReceipt(rotated ? 0 : 8, texts),
+      };
+    };
+    const rotate = async (uri: string) => ({ uri: `${uri}#rot`, width: 1200, height: 1600 });
+    const result = await runReceiptOcr(
+      { uri: 'file:///tilted.jpg', width: 1200, height: 1600 },
+      undefined,
+      recognize,
+      quality,
+      rotate,
+    );
+    expect(recognizeCalls).toBe(2);
+    expect(result.variantsCompared).toBe(2);
+    // 회전본에서만 잡힌 리본 문구가 최종 결과에 반영된다.
+    expect(result.fields.find(({ key }) => key === 'ribbonText')?.value).toContain(
+      '삼가 고인의 명복을 빕니다',
+    );
+  });
+
+  it('deskew: 회전/재인식이 실패하면 조용히 1차 결과를 유지한다', async () => {
+    let recognizeCalls = 0;
+    const texts = [
+      '상품명: 근조화환 3단',
+      '배송주소: 서울 강남구 테헤란로 1',
+      '수령인 전화: 010-1234-5678',
+      '잡음3',
+      '잡음4',
+      '잡음5',
+      '잡음6',
+    ];
+    const recognize = async () => {
+      recognizeCalls += 1;
+      return { fullText: texts.join('\n'), processingMs: 1, lines: tiltedReceipt(8, texts) };
+    };
+    const rotate = async () => {
+      throw new Error('rotate failed');
+    };
+    const result = await runReceiptOcr(
+      { uri: 'file:///tilted.jpg', width: 1200, height: 1600 },
+      undefined,
+      recognize,
+      quality,
+      rotate,
+    );
+    expect(recognizeCalls).toBe(1);
+    expect(result.variantsCompared).toBe(1);
+    expect(result.fields.find(({ key }) => key === 'productName')?.value).toBe(
+      '근조화환 3단',
+    );
+  });
 });
 
 // 실기기 ML Kit가 반환한 한국직거래화훼센터 인수증 원문에서, 라벨이 부분 인식된

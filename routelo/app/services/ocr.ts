@@ -7,6 +7,7 @@ import {
 import { fixConfusableDigits } from '../ocr/confusables';
 import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
 import { applyOfficialOcrFieldGuardrails } from '../ocr/fieldValidation';
+import { estimateSkewDegrees } from '../ocr/deskew';
 import { buildLayoutText } from '../ocr/layout';
 import { normalizeReceipt } from '../ocr/normalize';
 import { enrichOcrPipelineResult } from './ocrMetadata';
@@ -41,6 +42,13 @@ type RecognizedText = {
 };
 
 type RecognizeImage = (imageUri: string) => Promise<RecognizedText>;
+
+// deskew 2-pass에서 원본 이미지를 각도만큼 회전한 새 이미지를 만든다. 런타임
+// 기본 구현은 expo-image-manipulator를 지연 로드하며, 테스트에서는 주입한다.
+type RotateImage = (
+  imageUri: string,
+  degrees: number,
+) => Promise<{ uri: string; width?: number; height?: number }>;
 
 export class OcrRecognizerUnavailableError extends Error {
   constructor(
@@ -968,11 +976,55 @@ export function parseReceiptText(
   });
 }
 
+// 인식 결과(recognized) 하나를 레이아웃 텍스트 → 필드 파싱 → 공간 휴리스틱까지
+// 돌려 파이프라인 결과를 만든다. deskew 2-pass에서 원본/회전본에 각각 적용해
+// 비교하기 위해 순수 빌드 단계로 분리했다(assert/enrich는 최종 선택본에만).
+function buildOcrResultFromRecognition(
+  recognized: RecognizedText,
+  asset: ImageAssetInfo,
+  quality: CaptureQuality,
+): { parsed: OcrPipelineResult; textForParsing: string } {
+  const layoutText = buildLayoutText(recognized.lines || [], recognized.fullText);
+  const textForParsing =
+    receiptEvidenceScore(layoutText) >= receiptEvidenceScore(recognized.fullText)
+      ? layoutText
+      : recognized.fullText;
+  const parsed = applySpatialOcrFieldHeuristics(
+    parseReceiptText(textForParsing, quality),
+    recognized.lines || [],
+    { width: asset.width, height: asset.height },
+  );
+  return { parsed, textForParsing };
+}
+
+// deskew 후보 우열 판정용 점수. 문서 신뢰도를 지배적 가중치로 두고, 필수 필드
+// 충족을 그다음, 선택 필드 채움은 소폭만 보상한다. (선택 필드 하나가 잡음으로
+// 채워졌다고 신뢰도가 떨어진 회전본을 채택하지 않도록 — 리뷰 지적 반영. 추가로
+// 호출부에서 신뢰도 하락 가드를 둔다.) 회전본이 이 점수를 실질적으로 높일 때만
+// 채택하므로 각도/부호 오류 시 원본이 유지된다(회귀 방지).
+function scoreDeskewCandidate(parsed: OcrPipelineResult): number {
+  const filled = parsed.fields.filter((field) => field.value.trim()).length;
+  const requiredFilled = parsed.fields.filter(
+    (field) => field.required && field.value.trim(),
+  ).length;
+  return parsed.documentConfidence * 1.0 + requiredFilled * 8 + filled * 2;
+}
+
+const defaultRotateImage: RotateImage = async (imageUri, degrees) => {
+  const { manipulateAsync, SaveFormat } = await import('expo-image-manipulator');
+  const result = await manipulateAsync(imageUri, [{ rotate: degrees }], {
+    compress: 1,
+    format: SaveFormat.JPEG,
+  });
+  return { uri: result.uri, width: result.width, height: result.height };
+};
+
 export async function runReceiptOcr(
   asset: ImageAssetInfo,
   rawText?: string,
   recognizeImage?: RecognizeImage,
   qualityOverride?: CaptureQuality,
+  rotateImage?: RotateImage,
 ): Promise<OcrPipelineResult> {
   const quality = qualityOverride || inspectCaptureQuality(asset);
   if (rawText?.trim()) {
@@ -1006,36 +1058,69 @@ export async function runReceiptOcr(
           .join(' '),
       );
     }
-    const layoutText = buildLayoutText(
-      recognized.lines || [],
-      recognized.fullText,
-    );
-    const textForParsing =
-      receiptEvidenceScore(layoutText) >= receiptEvidenceScore(recognized.fullText)
-        ? layoutText
-        : recognized.fullText;
-    const parsed = applySpatialOcrFieldHeuristics(
-      parseReceiptText(textForParsing, quality),
-      recognized.lines || [],
-      {
-        width: asset.width,
-        height: asset.height,
-      },
-    );
-    assertUsefulOcrEvidence(textForParsing, parsed);
+
+    let chosenRecognized: RecognizedText = recognized;
+    let chosen = buildOcrResultFromRecognition(recognized, asset, quality);
+    let variantsCompared = 1;
+
+    // deskew 2-pass: 라인 박스로 문서 기울기를 추정해 confident할 때만 원본을
+    // -degrees 회전해 재인식한다. 회전본이 인식 품질을 실질적으로 높이고 문서
+    // 신뢰도가 떨어지지 않을 때만 채택(부호/각도 오류 시 원본 폴백). 각도 추정과
+    // 회전·재인식은 모두 try 안에서 수행해 어떤 예외도 1차 결과를 파괴하지 않는다.
+    try {
+      const skew = estimateSkewDegrees(recognized.lines || []);
+      if (skew.confident) {
+        const rotate = rotateImage || defaultRotateImage;
+        const rotated = await rotate(asset.uri, -skew.degrees);
+        const rotatedRecognized = await recognize(rotated.uri);
+        if (rotatedRecognized.fullText.trim()) {
+          variantsCompared = 2;
+          const rotatedAsset: ImageAssetInfo = {
+            ...asset,
+            uri: rotated.uri,
+            width: rotated.width ?? asset.width,
+            height: rotated.height ?? asset.height,
+          };
+          const rotatedBuild = buildOcrResultFromRecognition(
+            rotatedRecognized,
+            rotatedAsset,
+            quality,
+          );
+          // 신뢰도 하락 가드: 점수가 높아도 문서 신뢰도가 원본보다 크게 떨어지면
+          // (잡음 필드로 점수만 오른 경우) 채택하지 않는다.
+          const confidenceOk =
+            rotatedBuild.parsed.documentConfidence >=
+            chosen.parsed.documentConfidence - 2;
+          if (
+            confidenceOk &&
+            scoreDeskewCandidate(rotatedBuild.parsed) >
+              scoreDeskewCandidate(chosen.parsed)
+          ) {
+            chosen = rotatedBuild;
+            chosenRecognized = rotatedRecognized;
+          }
+        }
+      }
+    } catch {
+      // 각도 추정·회전·재인식 중 어떤 실패든 1차 결과를 그대로 사용한다.
+    }
+
+    assertUsefulOcrEvidence(chosen.textForParsing, chosen.parsed);
     return enrichOcrPipelineResult({
-      ...parsed,
-      engine: recognized.engine || 'ppocrv5',
-      modelVersion: recognized.modelVersion,
-      recognizedLines: recognized.lines,
-      processingMs: recognized.processingMs,
-      variantsCompared:
-        'variantsCompared' in recognized
-          ? recognized.variantsCompared ?? parsed.variantsCompared
-          : parsed.variantsCompared,
+      ...chosen.parsed,
+      engine: chosenRecognized.engine || 'ppocrv5',
+      modelVersion: chosenRecognized.modelVersion,
+      recognizedLines: chosenRecognized.lines,
+      processingMs: chosenRecognized.processingMs,
+      variantsCompared: Math.max(
+        variantsCompared,
+        'variantsCompared' in chosenRecognized
+          ? chosenRecognized.variantsCompared ?? 1
+          : 1,
+      ),
       ocrDiagnostics: {
-        ...recognized.diagnostics,
-        rawTextLength: textForParsing.length,
+        ...chosenRecognized.diagnostics,
+        rawTextLength: chosen.textForParsing.length,
       },
     });
   } catch (error) {
