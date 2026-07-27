@@ -128,6 +128,7 @@ import {
   OcrRecognizerUnavailableError,
   runReceiptOcr,
 } from './services/ocr';
+import { suggestDeliveryVenues, VenueSuggestion } from './ocr/venue';
 import {
   inspectReceiptImageQuality,
   prepareReceiptImageForOcr,
@@ -3064,6 +3065,20 @@ function OcrScannerModal({
   const [liveSession, setLiveSession] = useState(createInitialLiveOcrSession);
   const deliveryAddressValue =
     fields.find((item) => item.key === 'deliveryAddress')?.value || '';
+  // 수도권 장소 사전 후보(배송지/상호명). 매칭 없으면 빈 배열 → OCR 값 그대로.
+  // 비파괴: 후보를 탭했을 때만 값이 반영된다(자동확정 없음). 배송지/상호명/상품명
+  // 값이 바뀔 때만 재계산(다른 필드 편집 키 입력마다 전체 사전 스캔하지 않도록).
+  const venueMatchDeps = fields
+    .filter((f) => ['deliveryAddress', 'venueName', 'productName'].includes(f.key))
+    .map((f) => `${f.key}=${f.value}`)
+    .join('||');
+  const venueSuggestions = useMemo<VenueSuggestion[]>(
+    () => suggestDeliveryVenues(fields),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [venueMatchDeps],
+  );
+  const venueCandidatesFor = (key: string) =>
+    venueSuggestions.find((s) => s.fieldKey === key)?.candidates ?? [];
 
   const reset = () => {
     setStage('capture');
@@ -3633,6 +3648,32 @@ function OcrScannerModal({
                           onPress={() => updateField(field.key, candidate)}
                         >
                           <Text style={styles.candidateChipText}>{candidate}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                  {venueCandidatesFor(field.key).length > 0 && (
+                    <View style={styles.candidateRow}>
+                      <Text style={styles.candidateLabel}>장소 후보</Text>
+                      {venueCandidatesFor(field.key).map((candidate) => (
+                        <Pressable
+                          key={`${candidate.entry.name}|${candidate.entry.district || ''}`}
+                          style={styles.venueCandidateChip}
+                          onPress={() =>
+                            updateField(field.key, candidate.entry.name)
+                          }
+                        >
+                          <Ionicons
+                            name="business-outline"
+                            size={13}
+                            color={C.primary}
+                          />
+                          <Text style={styles.venueCandidateChipText}>
+                            {candidate.entry.name}
+                            {candidate.entry.district
+                              ? ` · ${candidate.entry.district}`
+                              : ''}
+                          </Text>
                         </Pressable>
                       ))}
                     </View>
@@ -5552,6 +5593,18 @@ const makeStyles = (C: Palette) =>
   candidateLabel: { color: C.textMuted, fontSize: 8, fontWeight: '700' },
   candidateChip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, backgroundColor: C.surfaceAlt },
   candidateChipText: { color: C.primary, fontSize: 8, fontWeight: '700' },
+  venueCandidateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 9,
+    borderWidth: 0.5,
+    borderColor: C.primary,
+    backgroundColor: C.surfaceAlt,
+  },
+  venueCandidateChipText: { color: C.primary, fontSize: 8, fontWeight: '700' },
   addressVerificationCard: {
     marginTop: 11,
     padding: 12,
