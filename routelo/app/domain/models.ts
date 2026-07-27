@@ -182,6 +182,25 @@ export type ReceiptDocument<TFields extends Record<string, unknown> = Record<str
   linkedDeliveryId?: string;
 };
 
+// 인수증 보관함(주별) 레코드. OCR 라인 전체를 담는 ReceiptDocument와 달리,
+// 촬영본을 사용자가 삭제하기 전까지 영구 보관하기 위한 경량 아카이브 항목이다.
+// imagePath는 앱 문서 디렉터리 기준 상대 경로(receipt-photos/…).
+export type ArchivedReceipt = {
+  schemaVersion: number;
+  id: string;
+  imagePath: string;
+  capturedAt: string; // ISO 8601 (UTC)
+  weekKey: string; // 그룹핑용 ISO 주 키(예: 2026-W24)
+  // 목록에서 빠르게 식별하기 위한 요약(값은 검토 전 추정치일 수 있음).
+  summary?: {
+    deliveryAddress?: string;
+    recipientName?: string;
+    productName?: string;
+    documentConfidence?: number;
+  };
+  linkedDeliveryId?: string;
+};
+
 export type RouteStop = {
   deliveryOrderId: string;
   sequence: number;

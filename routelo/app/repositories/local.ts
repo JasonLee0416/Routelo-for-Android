@@ -1,4 +1,5 @@
 import {
+  ArchivedReceipt,
   compareCalendarItems,
   DeliveryOrder,
   DOMAIN_SCHEMA_VERSION,
@@ -23,6 +24,7 @@ import { ContactLog, FuelLog, MileageLog } from '../models';
 export const LEGACY_DELIVERY_KEY = '@routelo/md3-state/v1';
 const DELIVERY_KEY = '@routelo/delivery-orders/v1';
 const RECEIPT_KEY = '@routelo/receipt-documents/v1';
+const RECEIPT_ARCHIVE_KEY = '@routelo/receipt-archive/v1';
 const ROUTE_KEY = '@routelo/route-plans/v1';
 const FUEL_KEY = '@routelo/fuel-logs/v1';
 const MILEAGE_KEY = '@routelo/mileage-logs/v1';
@@ -260,6 +262,20 @@ class LocalCollectionRepository<T extends { id: string }> {
 
   async remove(id: string) {
     await this.saveAll((await this.list()).filter((record) => record.id !== id));
+  }
+}
+
+export class LocalReceiptArchiveRepository extends LocalCollectionRepository<ArchivedReceipt> {
+  constructor(store: KeyValueStore) {
+    super(store, RECEIPT_ARCHIVE_KEY);
+  }
+
+  // 최신 촬영본이 먼저 오도록 capturedAt 내림차순 정렬해 반환한다.
+  async listNewestFirst(): Promise<ArchivedReceipt[]> {
+    const records = await this.list();
+    return records.sort((left, right) =>
+      right.capturedAt.localeCompare(left.capturedAt),
+    );
   }
 }
 
