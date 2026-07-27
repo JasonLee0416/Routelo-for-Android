@@ -66,7 +66,7 @@ describe('OCR metadata enrichment', () => {
   it('marks fallback reasons, event type, and phone kind', () => {
     const result = enrichOcrPipelineResult(baseResult());
     expect(result.cloudFallback?.trigger).toBe(true);
-    expect(result.cloudFallback?.reasons.join(' ')).toContain('Required field missing');
+    expect(result.cloudFallback?.reasons.join(' ')).toContain('필수 항목 누락');
     expect(result.eventType).toMatchObject({ type: 'congratulation' });
     expect(result.fields.find((field) => field.key === 'recipientTel')?.phoneKind).toBe('direct');
   });

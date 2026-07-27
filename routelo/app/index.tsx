@@ -3587,7 +3587,7 @@ function OcrScannerModal({
                 <View style={styles.reviewGuide}>
                   <Ionicons name="cloud-upload-outline" size={19} color={C.warning} />
                   <Text style={styles.reviewGuideText}>
-                    CLOVA fallback 또는 수동 확인 권장: {result.cloudFallback.reasons.slice(0, 3).join(' / ')}
+                    수동 확인 권장 · {result.cloudFallback.reasons.slice(0, 3).join(' / ')}
                   </Text>
                 </View>
               )}
