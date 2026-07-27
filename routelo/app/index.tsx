@@ -3393,7 +3393,8 @@ function OcrScannerModal({
                 <Text style={styles.autoCaptureText}>단일 프레임 인식</Text>
               </View>
             </View>
-            <OcrRuntimeInputCard evidence={ocrInputEvidence} />
+            {/* OCR runtime/input evidence 진단 카드는 일반 사용자에게 불필요해
+                촬영 화면에서 숨긴다(스크롤 없이 한 화면). 진단은 검토 화면에 유지. */}
             {ocrErrorMessage ? (
               <View style={styles.ocrDiagnosticCard}>
                 <Ionicons name="bug-outline" size={19} color={C.warning} />
@@ -3403,7 +3404,6 @@ function OcrScannerModal({
                 </View>
               </View>
             ) : null}
-            <OcrDiagnosticComparisonCard report={diagnosticReport} />
             {visionCameraPreviewProbeEnabled() ? (
               <VisionCameraPreviewProbe isActive={visible && stage === 'capture'} />
             ) : null}
