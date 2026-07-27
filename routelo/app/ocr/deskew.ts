@@ -45,8 +45,9 @@ function rowSeparationScore(points: Point[], angleRad: number, bucket: number) {
   const cos = Math.cos(angleRad);
   const buckets = new Map<number, number>();
   for (const point of points) {
-    // -θ 회전 후 y' = -x*sin(-θ)+y*cos(-θ) = x*sinθ + y*cosθ ... 부호는
-    // rotate 규약과 맞추기 위해 아래처럼 둔다(θ>0: 반시계로 기운 문서를 편다).
+    // 표준 회전행렬로 점을 -θ 회전했을 때의 y좌표: y' = y*cosθ - x*sinθ.
+    // 문서가 θ만큼 기울어져 있으면 이 역회전에서 같은 행의 점들이 같은 y'로
+    // 모여 버킷 히스토그램이 뾰족해진다(행 분리도↑).
     const rotatedY = point.y * cos - point.x * sin;
     const key = Math.round(rotatedY / bucket);
     buckets.set(key, (buckets.get(key) || 0) + 1);
