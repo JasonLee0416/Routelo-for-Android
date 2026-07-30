@@ -143,6 +143,11 @@ function assign(
 export function normalizeReceipt(lines: string[], registry: FieldDef[]): NormalizeResult {
   const result: NormalizeResult = { fields: {}, unmapped: [] };
   let pending: { key: ReceiptFieldKey; label: string } | null = null;
+  // 직전 줄이 '라벨 없는 고아값'이면 그 unmapped 인덱스를 기억한다. 인수증 표는
+  // 셀 인식 순서가 "값 → 라벨"로 뒤집혀 나오기도 하는데(예: "서울 보라매병원 1호"
+  // 다음 줄에 "배달장소"), 이때 라벨 줄에서 직전 고아값을 되끌어와 필드에 붙인다.
+  // 고아 push 외의 어떤 처리든 -1로 리셋해 '바로 직전'만 대상으로 삼는다(오연결 방지).
+  let lastOrphanIndex = -1;
 
   for (const rawLine of lines) {
     const parsed = parseLine(rawLine, registry);
@@ -153,22 +158,38 @@ export function normalizeReceipt(lines: string[], registry: FieldDef[]): Normali
       if (parsed.value) {
         assign(result, parsed.field.key, parsed.value, parsed.label);
         pending = null;
+        lastOrphanIndex = -1;
+      } else if (
+        lastOrphanIndex >= 0 &&
+        (result.fields[parsed.field.key] === undefined ||
+          result.fields[parsed.field.key] === '')
+      ) {
+        // "값(직전 고아) → 라벨(현재 줄)" 역순 레이아웃: 직전 고아값을 이 필드로.
+        const orphan = result.unmapped[lastOrphanIndex];
+        result.unmapped.splice(lastOrphanIndex, 1);
+        assign(result, parsed.field.key, orphan.value, parsed.label);
+        pending = null;
+        lastOrphanIndex = -1;
       } else {
         // "라벨:" 만 있고 값은 다음 줄 → 보류
         pending = { key: parsed.field.key, label: parsed.label };
+        lastOrphanIndex = -1;
       }
     } else if (parsed.label === '') {
       // 라벨 없는 순수 값/고아 텍스트
       if (pending) {
         assign(result, pending.key, parsed.value, pending.label);
         pending = null;
+        lastOrphanIndex = -1;
       } else {
         result.unmapped.push({ label: '', value: parsed.value });
+        lastOrphanIndex = result.unmapped.length - 1;
       }
     } else {
       // 콜론은 있으나 어느 필드에도 매칭 안 됨 → 라벨/값 그대로 보존
       result.unmapped.push({ label: parsed.label, value: parsed.value });
       pending = null;
+      lastOrphanIndex = -1;
     }
   }
 
