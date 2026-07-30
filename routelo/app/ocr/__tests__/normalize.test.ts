@@ -30,6 +30,11 @@ describe('matchField', () => {
     expect(matchField('배송주소', REGISTRY)?.key).toBe('deliveryAddress');
   });
 
+  it('배달장소·배송장소 라벨도 배송 주소로 매핑한다', () => {
+    expect(matchField('배달장소', REGISTRY)?.key).toBe('deliveryAddress');
+    expect(matchField('배송장소', REGISTRY)?.key).toBe('deliveryAddress');
+  });
+
   it('관련 없는 텍스트는 매칭하지 않는다', () => {
     expect(matchField('합계 금액', REGISTRY)).toBeNull();
   });
@@ -97,5 +102,27 @@ describe('normalizeReceipt', () => {
     expect(result.unmapped).toEqual([
       { label: '', value: '배송 인수증' },
     ]);
+  });
+});
+
+describe('normalizeReceipt — 값→라벨 역순 레이아웃(표 셀 순서 뒤집힘)', () => {
+  // 실제 인수증 표는 PP-OCR이 "값 → 라벨" 순으로 셀을 읽어내기도 한다.
+  // (예: "서울 보라매병원 1호" 다음 줄에 라벨 "배달장소")
+  it('라벨 줄이 값보다 뒤에 와도 직전 고아값을 필드로 되끌어온다', () => {
+    const r = normalizeReceipt(
+      ['서울 보라매병원 1호', '배달장소', '받는분 고인 김기회'],
+      REGISTRY,
+    );
+    expect(r.fields.deliveryAddress).toBe('서울 보라매병원 1호');
+    expect(r.fields.recipientName).toBe('고인 김기회');
+    // 되끌어왔으므로 주소는 더 이상 unmapped에 남지 않는다.
+    expect(r.unmapped.some((u) => u.value.includes('보라매'))).toBe(false);
+  });
+
+  it('직전 줄이 고아값이 아니면 되끌어오지 않는다(오연결 방지)', () => {
+    const r = normalizeReceipt(['상품 축하 3단', '배달장소'], REGISTRY);
+    // 직전은 상품명(필드)이라 배달장소는 값 없는 라벨로 남고 흡수 안 함.
+    expect(r.fields.deliveryAddress).toBeUndefined();
+    expect(r.fields.productName).toBe('축하 3단');
   });
 });

@@ -99,7 +99,7 @@ export const DEFAULT_FIELD_REGISTRY: FieldDef[] = [
     key: 'deliveryAddress',
     label: '배송 주소',
     type: 'text',
-    aliases: ['배송주소', '배달주소', '배송 주소', '배달 주소', '배송지', '배달지', '주소', '도착지'],
+    aliases: ['배송주소', '배달주소', '배송 주소', '배달 주소', '배송지', '배달지', '배달장소', '배송장소', '주소', '도착지'],
   },
   {
     key: 'recipientName',
