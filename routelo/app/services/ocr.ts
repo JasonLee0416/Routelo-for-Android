@@ -434,6 +434,79 @@ function firstMatchingLine(
   };
 }
 
+// 온디바이스 한국어 엔진은 인수증 표를 셀/행으로 분리하지 못하고 한 줄 덩어리로
+// 출력하기도 한다(실기기 확인: "…서울 보라매병원 1호 HP 배달장소 받는분 …").
+// 이때 라벨과 값이 한 줄에 섞여 findLabeledValue(줄머리 라벨)로는 배송주소를 못
+// 뽑는다. 평탄화된 text에서 주소 라벨에 인접한(뒤=정상순서 우선, 앞=값→라벨 역순)
+// 지역-앵커 주소 스팬을 추출한다. 값은 forceReview 대상이라 zero-fabrication 유지.
+const ADDRESS_INLINE_REGION =
+  '(?:서울|경기|인천|부산|대구|대전|광주|울산|세종|제주|강원|충청|충북|충남|전라|전북|전남|경상|경북|경남)';
+const ADDRESS_INLINE_LABEL =
+  /(?:배송주소|배달주소|배송장소|배달장소|배송지|배달지)/;
+const ADDRESS_INLINE_DETAIL =
+  /(?:로|길|동|읍|면|리|병원|장례식장|빈소|웨딩|예식장|호텔|호실|호|층|빌딩|센터|회관|아파트|상가|타워|구|시)/;
+// 주소 스팬의 경계로 보는 '다른 필드' 라벨/잡토큰.
+const ADDRESS_INLINE_STOP =
+  /(?:받는분|반는분|보내는분|받으실|인수|수령|관계|리본|품명|수량|배달일시|요청|메모|본부|hp|h\.p|tel|fax|전화|팩스|절)/i;
+
+function cleanInlineAddressSpan(span: string) {
+  return span
+    .replace(/^[\s|:：·<>]+/, '')
+    .replace(/[\s|:：·<>]+$/, '')
+    .trim();
+}
+function inlineAddressAfter(after: string) {
+  const rm = new RegExp(ADDRESS_INLINE_REGION).exec(after);
+  if (!rm) return undefined;
+  let span = after.slice(rm.index);
+  const stop = new RegExp('\\s' + ADDRESS_INLINE_STOP.source, 'i').exec(span);
+  if (stop) span = span.slice(0, stop.index);
+  span = cleanInlineAddressSpan(span);
+  return span.length > 40 ? span.slice(0, 40).trim() : span;
+}
+function inlineAddressBefore(before: string) {
+  const re = new RegExp(ADDRESS_INLINE_REGION, 'g');
+  let last = -1;
+  let rm: RegExpExecArray | null;
+  while ((rm = re.exec(before))) last = rm.index;
+  if (last < 0) return undefined;
+  let span = before.slice(last);
+  for (let i = 0; i < 4; i += 1) {
+    const next = span
+      .replace(new RegExp('\\s' + ADDRESS_INLINE_STOP.source + '.*$', 'i'), '')
+      .trim();
+    if (next === span) break;
+    span = next;
+  }
+  span = cleanInlineAddressSpan(span);
+  return span.length > 40 ? span.slice(-40).trim() : span;
+}
+function validInlineAddress(span?: string): span is string {
+  return (
+    !!span &&
+    span.length >= 4 &&
+    span.length <= 40 &&
+    new RegExp(ADDRESS_INLINE_REGION).test(span) &&
+    ADDRESS_INLINE_DETAIL.test(span)
+  );
+}
+// 평탄화된 전체 text에서 배송주소 라벨 인접 주소를 추출(없으면 undefined).
+function findAddressNearLabel(text: string) {
+  const m = ADDRESS_INLINE_LABEL.exec(text);
+  if (!m) return undefined;
+  const before = text.slice(0, m.index);
+  const after = text.slice(m.index + m[0].length);
+  const fromAfter = inlineAddressAfter(after);
+  const fromBefore = inlineAddressBefore(before);
+  const candidate = validInlineAddress(fromAfter)
+    ? fromAfter
+    : validInlineAddress(fromBefore)
+      ? fromBefore
+      : undefined;
+  if (!candidate) return undefined;
+  return { value: candidate, sourceText: candidate, sourceLineIds: [] as string[] };
+}
+
 function validatedPhoneCandidate(
   candidate: ReturnType<typeof findLabeledValue>,
 ) {
@@ -711,6 +784,7 @@ export function parseReceiptText(
     registrySource('venueName');
   const addressSource =
     findLabeledValue(lines, ['배송주소', '배달주소', '배송지', '배달장소', '주소']) ||
+    findAddressNearLabel(text) ||
     firstMatchingLine(lines, (line) =>
       /(?:서울|경기)\s+[\p{Script=Hangul}\d\- ]+(?:구|시|군)\s+/u.test(line),
     ) ||

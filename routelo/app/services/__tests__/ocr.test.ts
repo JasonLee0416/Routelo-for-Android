@@ -325,6 +325,36 @@ describe('OCR zero-fabrication guard', () => {
 // 별칭 사전('주처')은 이를 잡는데 그 결과(mapped)가 그동안 버려져 필드가 비었다.
 // 아래 테스트는 registrySource 폴백이 그 공백을 메우되 status는 'review'로만 두어
 // zero-fabrication을 지키는지 고정한다.
+// 온디바이스 한국어 엔진(android-korean-text)은 인수증 표를 셀/행으로 나누지 못하고
+// 한 줄 덩어리로 평탄화해 출력하기도 한다(실기기 logcat 확인). 이때 라벨과 값이 한
+// 줄에 섞여 findLabeledValue로는 배송주소를 못 뽑는다. findAddressNearLabel가 라벨
+// 인접 주소를 뽑아 채우는지 고정한다.
+describe('OCR 평탄화 한 줄 인수증 배송주소 추출 (온디바이스 엔진 대응)', () => {
+  const field = (result: ReturnType<typeof parseReceiptText>, key: string) =>
+    result.fields.find((item) => item.key === key);
+
+  it('값→라벨 역순으로 한 줄에 뭉친 배송주소를 라벨 인접으로 뽑는다', () => {
+    // 실기기 raw 형태: "…서울 보라매병원 1호 HP 배달장소 받는분 : …"
+    const flat =
+      '품명 근조 3단 배달일시 2026년 06월 14일 보내는분 모상경 서울 보라매병원 1호 HP 배달장소 받는분 : 고인 김기회 배송하신분은 인수후 바로 해피콜 하세요.';
+    expect(field(parseReceiptText(flat, quality), 'deliveryAddress')?.value).toBe(
+      '서울 보라매병원 1호',
+    );
+  });
+
+  it('정상순서(배달장소→값)도 라벨 인접으로 뽑는다', () => {
+    const flat = '품명 근조3단 배달장소 서울 강남구 선릉로 100 받는분 홍길동';
+    expect(field(parseReceiptText(flat, quality), 'deliveryAddress')?.value).toBe(
+      '서울 강남구 선릉로 100',
+    );
+  });
+
+  it('주소 라벨이 없으면 가짜 주소를 만들지 않는다(zero-fabrication)', () => {
+    const flat = '한국직거래화훼센터 본부전화 1566-0028 받는분 홍길동';
+    expect(field(parseReceiptText(flat, quality), 'deliveryAddress')?.value).toBe('');
+  });
+});
+
 describe('OCR registry alias fallback (dead-code activation)', () => {
   const field = (result: ReturnType<typeof parseReceiptText>, key: string) =>
     result.fields.find((item) => item.key === key);
