@@ -48,12 +48,19 @@ const FUZZY_THRESHOLD = 0.6; // 이 미만의 유사도면 후보로도 보지 �
 // 값이 라벨에 섞여 들어가는 오분리를 막기 위해 높게 둔다(사실상 정확/근접매칭).
 const STRONG_THRESHOLD = 0.8;
 
+// 본부/본사/고객센터 등 화원사 '헤더(HQ) 연락처'는 배송 대상 정보가 아니다.
+// "본부전화", "본부팩스"의 '전화'/'팩스' 부분일치로 recipientTel 등에 오매핑되는
+// 것을 원천 차단한다(#127). 정규화 라벨(공백·구두점 제거) 기준으로 검사한다.
+const HEADER_CONTACT_NOISE = /(본부|본사|지사|고객센터|콜센터|대표전화|대표팩스|대표번호)/;
+
 export type MatchResult = { key: ReceiptFieldKey; score: number } | null;
 
 // 라벨 하나를 가장 잘 맞는 정규 필드에 매핑. 임계값 미만이면 null.
 export function matchField(label: string, registry: FieldDef[]): MatchResult {
   const target = normalizeLabel(label);
   if (!target) return null;
+  // 헤더(본부/본사/고객센터) 연락처는 어떤 배송 필드에도 매핑하지 않는다(#127).
+  if (HEADER_CONTACT_NOISE.test(target)) return null;
 
   let best: MatchResult = null;
   const consider = (key: ReceiptFieldKey, score: number) => {

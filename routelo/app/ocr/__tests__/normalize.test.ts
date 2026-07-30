@@ -33,6 +33,29 @@ describe('matchField', () => {
   it('관련 없는 텍스트는 매칭하지 않는다', () => {
     expect(matchField('합계 금액', REGISTRY)).toBeNull();
   });
+
+  it('본부전화·본부팩스 등 헤더(HQ) 연락처는 어떤 필드에도 매핑하지 않는다 (#127)', () => {
+    expect(matchField('본부전화', REGISTRY)).toBeNull();
+    expect(matchField('본부팩스', REGISTRY)).toBeNull();
+    expect(matchField('고객센터', REGISTRY)).toBeNull();
+    // 정상 연락처 라벨은 그대로 매핑되어야 한다(과잉 차단 방지).
+    expect(matchField('연락처', REGISTRY)?.key).toBe('recipientTel');
+  });
+});
+
+describe('normalizeReceipt — 헤더 연락처 오매핑 방지 (#127)', () => {
+  it('본부전화/본부팩스는 recipientTel이 아니라 unmapped로 보존한다', () => {
+    const r = normalizeReceipt(
+      ['본부전화:1566-0028', '본부팩스:1599-0028', '받는분 고인 김기회'],
+      REGISTRY,
+    );
+    expect(r.fields.recipientTel).toBeUndefined();
+    expect(r.fields.recipientName).toBe('고인 김기회');
+    expect(r.unmapped).toEqual([
+      { label: '본부전화', value: '1566-0028' },
+      { label: '본부팩스', value: '1599-0028' },
+    ]);
+  });
 });
 
 describe('parseLine', () => {
